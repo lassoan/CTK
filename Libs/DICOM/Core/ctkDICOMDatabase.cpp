@@ -1604,3 +1604,9 @@ bool ctkDICOMDatabase::cacheTag(const QString sopInstanceUID, const QString tag,
   insertTag.bindValue(":value",valueToInsert);
   return d->loggedExec(insertTag);
 }
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabase::updateDisplayedFields()
+{
+  // TODO: implement this
+}

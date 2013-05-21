@@ -145,6 +145,7 @@ void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase& ctkDICOMDatabase,
       break;
       }
   }
+  ctkDICOMDatabase.updateDisplayedFields();
   emit this->indexingComplete();
 }
 
