@@ -186,6 +186,9 @@ public:
                             bool createHierarchy = true,
                             const QString& destinationDirectoryName = QString() );
 
+  /// Update the fields in the database that are used for displaying information from information stored in the tag-cache
+  void updateDisplayedFields();
+
   /// Check if file is already in database and up-to-date
   bool fileExistsAndUpToDate(const QString& filePath);
 

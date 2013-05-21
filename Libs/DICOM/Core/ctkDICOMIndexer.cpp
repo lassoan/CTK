@@ -145,6 +145,10 @@ void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase& ctkDICOMDatabase,
       break;
       }
   }
+
+  // Update display tables according to inserted DICOM datasets
+  ctkDICOMDatabase.updateDisplayedFields();
+
   emit this->indexingComplete();
 }
 

@@ -474,7 +474,7 @@ QString ctkDICOMDatabase::schemaVersion()
   //   so that the ctkDICOMDatabasePrivate::filenames method
   //   still works.
   //
-  return QString("0.5.3");
+  return QString("0.6.0");
 };
 
 //------------------------------------------------------------------------------
@@ -1168,7 +1168,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMDataset& ctkDataset, const Q
       return;
     }
 
-  // store the file if the database is not in memomry
+  // store the file if the database is not in memory
   // TODO: if we are called from insert(file) we
   // have to do something else
   //
@@ -1220,7 +1220,8 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMDataset& ctkDataset, const Q
       if ( LastPatientID != patientID
            || LastPatientsBirthDate != patientsBirthDate
            || LastPatientsName != patientsName )
-        {  QString seriesInstanceUID(ctkDataset.GetElementAsString(DCM_SeriesInstanceUID) );
+        {  
+          QString seriesInstanceUID(ctkDataset.GetElementAsString(DCM_SeriesInstanceUID) );
 
           qDebug() << "This looks like a different patient from last insert: " << patientID;
           // Ok, something is different from last insert, let's insert him if he's not
@@ -1244,7 +1245,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMDataset& ctkDataset, const Q
           insertStudy(ctkDataset,dbPatientID);
         }
 
-      if ( seriesInstanceUID != "" && seriesInstanceUID != LastSeriesInstanceUID )
+      if ( seriesInstanceUID != "" && LastSeriesInstanceUID != seriesInstanceUID )
         {
           insertSeries(ctkDataset, studyInstanceUID);
         }
@@ -1603,4 +1604,12 @@ bool ctkDICOMDatabase::cacheTag(const QString sopInstanceUID, const QString tag,
   insertTag.bindValue(":tag",tag);
   insertTag.bindValue(":value",valueToInsert);
   return d->loggedExec(insertTag);
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabase::updateDisplayedFields()
+{
+  //TODO Update the files for which the DisplayedFieldsUpdatedTimestamp is NULL
+
+  //TODO Use rules
 }
