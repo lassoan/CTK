@@ -345,7 +345,6 @@ ctkDICOMDatabase::ctkDICOMDatabase(QString databaseFile)
   Q_D(ctkDICOMDatabase);
   d->registerCompressionLibraries();
   d->init(databaseFile);
-  d->DisplayedFieldGenerator.setDatabase(this);
 }
 
 ctkDICOMDatabase::ctkDICOMDatabase(QObject* parent)
@@ -1675,6 +1674,8 @@ void ctkDICOMDatabase::updateDisplayedFields()
   QMap<QString, QMap<QString, QString> > displayFieldsMapSeries;
   d->getDisplayFieldsCache(displayFieldsMapPatient, displayFieldsMapStudy, displayFieldsMapSeries);
 
+  d->DisplayedFieldGenerator.setDatabase(this);
+
   // Get display names for newly added files and add them into the display tables
   while (newFilesQuery.next())
   {
@@ -1722,7 +1723,7 @@ void ctkDICOMDatabasePrivate::getDisplayFieldsCache( QMap<QString, QMap<QString,
 
   QSqlQuery studyQuery(Database);
   displayFieldsMapStudy.clear();
-  loggedExec(studyQuery,QString("SELECT * FROM DisplayStudy;"));
+  loggedExec(studyQuery,QString("SELECT * FROM DisplayStudies;"));
   while (studyQuery.next())
   {
     QSqlRecord studyRecord = studyQuery.record();
@@ -1771,15 +1772,15 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       foreach (QString tagName, currentPatient.keys())
       {
         displayPatientsFieldList.append( "'" + tagName + "', " );
-        displayPatientsValueList.append( currentPatient[tagName] + ", " );
+        displayPatientsValueList.append( "'" + currentPatient[tagName] + "', " );
       }
       // Trim the separators from the end
-      displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
+      displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 2);
       displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
 
-      applyDisplayPatientChangesStatement.prepare ( "INSERT INTO DisplayPatients (?) values (?);" );
-      applyDisplayPatientChangesStatement.bindValue ( 0, displayPatientsFieldList );
-      applyDisplayPatientChangesStatement.bindValue ( 1, displayPatientsValueList );
+      QString applyDisplayPatientChangesStatementString = 
+        QString("INSERT INTO DisplayPatients (%1) VALUES (%2);").arg(displayPatientsFieldList).arg(displayPatientsValueList);
+      applyDisplayPatientChangesStatement.prepare(applyDisplayPatientChangesStatementString);
     }
     else // Update if it already exists
     {
@@ -1791,9 +1792,9 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       // Trim the separators from the end
       displayPatientsFieldUpdateList = displayPatientsFieldUpdateList.left(displayPatientsFieldUpdateList.size() - 2);
 
-      applyDisplayPatientChangesStatement.prepare ( "UPDATE table_name SET (?) WHERE UID=(?);" );
-      applyDisplayPatientChangesStatement.bindValue ( 0, displayPatientsFieldUpdateList );
-      applyDisplayPatientChangesStatement.bindValue ( 1, currentPatient["UID"] );
+      QString applyDisplayPatientChangesStatementString = 
+        QString("UPDATE DisplayPatients SET %1 WHERE UID=%2;").arg(displayPatientsFieldUpdateList).arg(currentPatient["UID"]);
+      applyDisplayPatientChangesStatement.prepare(applyDisplayPatientChangesStatementString);
     }
     loggedExec(applyDisplayPatientChangesStatement);
   }
@@ -1811,15 +1812,15 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       foreach (QString tagName, currentStudy.keys())
       {
         displayStudiesFieldList.append( "'" + tagName + "', " );
-        displayStudiesValueList.append( currentStudy[tagName] + ", " );
+        displayStudiesValueList.append( "'" + currentStudy[tagName] + "', " );
       }
       // Trim the separators from the end
-      displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
+      displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 2);
       displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
 
-      applyDisplayStudyChangesStatement.prepare ( "INSERT INTO DisplayStudies (?) values (?);" );
-      applyDisplayStudyChangesStatement.bindValue ( 0, displayStudiesFieldList );
-      applyDisplayStudyChangesStatement.bindValue ( 1, displayStudiesValueList );
+      QString applyDisplayStudyChangesStatementString = 
+        QString("INSERT INTO DisplayStudies (%1) VALUES (%2);").arg(displayStudiesFieldList).arg(displayStudiesValueList);
+      applyDisplayStudyChangesStatement.prepare(applyDisplayStudyChangesStatementString);
     }
     else // Update if it already exists
     {
@@ -1831,9 +1832,9 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       // Trim the separators from the end
       displayStudiesFieldUpdateList = displayStudiesFieldUpdateList.left(displayStudiesFieldUpdateList.size() - 2);
 
-      applyDisplayStudyChangesStatement.prepare ( "UPDATE table_name SET (?) WHERE UID=(?);" );
-      applyDisplayStudyChangesStatement.bindValue ( 0, displayStudiesFieldUpdateList );
-      applyDisplayStudyChangesStatement.bindValue ( 1, currentStudy["UID"] );
+      QString applyDisplayStudyChangesStatementString = 
+        QString("UPDATE DisplayStudies SET %1 WHERE UID=%2;").arg(displayStudiesFieldUpdateList).arg(currentStudy["UID"]);
+      applyDisplayStudyChangesStatement.prepare(applyDisplayStudyChangesStatementString);
     }
     loggedExec(applyDisplayStudyChangesStatement);
   }
@@ -1851,15 +1852,15 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       foreach (QString tagName, currentSeries.keys())
       {
         displaySeriesFieldList.append( "'" + tagName + "', " );
-        displaySeriesValueList.append( currentSeries[tagName] + ", " );
+        displaySeriesValueList.append( "'" + currentSeries[tagName] + "', " );
       }
       // Trim the separators from the end
-      displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
+      displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 2);
       displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
 
-      applyDisplaySeriesChangesStatement.prepare ( "INSERT INTO DisplaySeries (?) values (?);" );
-      applyDisplaySeriesChangesStatement.bindValue ( 0, displaySeriesFieldList );
-      applyDisplaySeriesChangesStatement.bindValue ( 1, displaySeriesValueList );
+      QString applyDisplaySeriesChangesStatementString = 
+        QString("INSERT INTO DisplaySeries (%1) VALUES (%2);").arg(displaySeriesFieldList).arg(displaySeriesValueList);
+      applyDisplaySeriesChangesStatement.prepare(applyDisplaySeriesChangesStatementString);
     }
     else // Update if it already exists
     {
@@ -1871,9 +1872,9 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       // Trim the separators from the end
       displaySeriesFieldUpdateList = displaySeriesFieldUpdateList.left(displaySeriesFieldUpdateList.size() - 2);
 
-      applyDisplaySeriesChangesStatement.prepare ( "UPDATE table_name SET (?) WHERE UID=(?);" );
-      applyDisplaySeriesChangesStatement.bindValue ( 0, displaySeriesFieldUpdateList );
-      applyDisplaySeriesChangesStatement.bindValue ( 1, currentSeries["UID"] );
+      QString applyDisplaySeriesChangesStatementString = 
+        QString("UPDATE DisplaySeries SET %1 WHERE UID=%2;").arg(displaySeriesFieldUpdateList).arg(currentSeries["UID"]);
+      applyDisplaySeriesChangesStatement.prepare(applyDisplaySeriesChangesStatementString);
     }
     loggedExec(applyDisplaySeriesChangesStatement);
   }

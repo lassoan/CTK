@@ -83,26 +83,47 @@ public:
     return requiredTags;
   }
 
-  virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldNamesDisplayPatients, QMap<QString, QString> emptyFieldNamesDisplayStudies, QMap<QString, QString> emptyFieldNamesDisplaySeries)
+  virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldsDisplaySeries, QMap<QString, QString> emptyFieldsDisplayStudies, QMap<QString, QString> emptyFieldsDisplayPatients)
   {
-    emptyFieldNamesDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION);
+    emptyFieldsDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION);
   }
 
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)
   {
-    // TODO: implement this
+    displayFieldsForCurrentPatient["PatientName"]=cachedTags[dicomTagToString(DCM_PatientName)];    
+    displayFieldsForCurrentPatient.insert("PatientID",cachedTags[dicomTagToString(DCM_PatientID)]);
+
+    displayFieldsForCurrentStudy.insert("StudyDescription",cachedTags[dicomTagToString(DCM_StudyDescription)]);    
+    displayFieldsForCurrentStudy.insert("StudyDate",cachedTags[dicomTagToString(DCM_StudyDate)]);    
+    displayFieldsForCurrentStudy.insert("ModalitiesInStudy",cachedTags[dicomTagToString(DCM_ModalitiesInStudy)]);    
+    displayFieldsForCurrentStudy.insert("InstitutionName",cachedTags[dicomTagToString(DCM_InstitutionName)]);    
+    displayFieldsForCurrentStudy.insert("ReferringPhysician",cachedTags[dicomTagToString(DCM_ReferringPhysicianName)]);    
+
+    displayFieldsForCurrentSeries.insert("SeriesNumber",cachedTags[dicomTagToString(DCM_SeriesNumber)]);    
+    displayFieldsForCurrentSeries.insert("SeriesDescription",cachedTags[dicomTagToString(DCM_SeriesDescription)]);    
+    displayFieldsForCurrentSeries.insert("Modality",cachedTags[dicomTagToString(DCM_Modality)]);    
   }
 
   virtual void mergeDisplayFieldsForInstance(
     const QMap<QString, QString> &initialFieldsSeries, const QMap<QString, QString> &initialFieldsStudy, const QMap<QString, QString> &initialFieldsPatient,
     const QMap<QString, QString> &newFieldsSeries, const QMap<QString, QString> &newFieldsStudy, const QMap<QString, QString> &newFieldsPatient,
     QMap<QString, QString> &mergedFieldsSeries, QMap<QString, QString> &mergedFieldsStudy, QMap<QString, QString> &mergedFieldsPatient,
-    const QMap<QString, QString> &emptyFieldNamesSeries, const QMap<QString, QString> &emptyFieldNamesStudy, const QMap<QString, QString> &emptyFieldNamesPatient
+    const QMap<QString, QString> &emptyFieldsSeries, const QMap<QString, QString> &emptyFieldsStudy, const QMap<QString, QString> &emptyFieldsPatient
     )
   {
-    // TODO: implement this
-  }
+    mergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
+    mergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
 
+    mergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+
+    mergeExpectSameValue("SeriesNumber", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+    mergeConcatenate("SeriesDescription", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+    mergeExpectSameValue("Modality", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+  }
 
 };
 

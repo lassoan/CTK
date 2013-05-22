@@ -51,7 +51,7 @@ public:
     const QMap<QString, QString> &initialFieldsSeries, const QMap<QString, QString> &initialFieldsStudy, const QMap<QString, QString> &initialFieldsPatient,
     const QMap<QString, QString> &newFieldsSeries, const QMap<QString, QString> &newFieldsStudy, const QMap<QString, QString> &newFieldsPatient,
     QMap<QString, QString> &mergedFieldsSeries, QMap<QString, QString> &mergedFieldsStudy, QMap<QString, QString> &mergedFieldsPatient,
-    const QMap<QString, QString> &emptyFieldNamesSeries, const QMap<QString, QString> &emptyFieldNamesStudy, const QMap<QString, QString> &emptyFieldNamesPatient
+    const QMap<QString, QString> &emptyFieldsSeries, const QMap<QString, QString> &emptyFieldsStudy, const QMap<QString, QString> &emptyFieldsPatient
     )=0;
 
   virtual QStringList getRequiredDICOMTags()=0;
@@ -61,7 +61,85 @@ public:
     return QString("%1,%2").arg(tag.getGroup(),4,16,QLatin1Char('0')).arg(tag.getElement(),4,16,QLatin1Char('0'));
   }  
 
-  virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldNamesDisplayPatients, QMap<QString, QString> emptyFieldNamesDisplayStudies, QMap<QString, QString> emptyFieldNamesDisplaySeries)=0;
+  virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldsDisplaySeries, QMap<QString, QString> emptyFieldsDisplayStudies, QMap<QString, QString> emptyFieldsDisplayPatients)=0;
+
+  static bool isFieldEmpty(const QString &fieldName, const QMap<QString, QString> &fields, const QMap<QString, QString> &emptyValuesForEachField)
+  {
+    if (!fields.contains(fieldName))
+    {
+      // the field is not present
+      return true;
+    }
+    if (fields[fieldName].isEmpty())
+    {
+      // the field is present, but empty
+      return true;
+    }
+    if (emptyValuesForEachField[fieldName].contains(fields[fieldName]))
+    {
+      // the field is not empty, but contain a placeholder string (example: "No description") that means that the field is undefined
+      return true;
+    }
+    // this field is non-empty
+    return false;
+  }
+
+  static void mergeExpectSameValue(const QString &fieldName, const QMap<QString, QString> &initialFields, const QMap<QString, QString> &newFields, QMap<QString, QString> &mergedFields, const QMap<QString, QString> &emptyValuesForEachField )
+  {
+    if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
+    {
+      // no new value is defined for this value, keep the initial value (if exists)
+      if (!isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
+      {
+        mergedFields[fieldName]=initialFields[fieldName];
+      }
+      return;
+    }
+    if (isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
+    {
+      // no initial value is defined for this value, use just the new value (if exists)
+      if (!isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
+      {
+        mergedFields[fieldName]=newFields[fieldName];
+      }
+      return;
+    }
+    // both initial and new value are defined and they are different => just keep using the old value
+    // TODO: log warning here, as this is not expected
+    mergedFields[fieldName]=initialFields[fieldName];
+  }
+
+  static void mergeConcatenate(const QString &fieldName, const QMap<QString, QString> &initialFields, const QMap<QString, QString> &newFields, QMap<QString, QString> &mergedFields, const QMap<QString, QString> &emptyValuesForEachField)
+  {
+    if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
+    {
+      // no new value is defined for this value, keep the initial value (if exists)
+      if (!isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
+      {
+        mergedFields[fieldName]=initialFields[fieldName];
+      }
+      return;
+    }
+    if (isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
+    {
+      // no initial value is defined for this value, use just the new value (if exists)
+      if (!isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
+      {
+        mergedFields[fieldName]=newFields[fieldName];
+      }
+      return;
+    }
+    QStringList initialValueSplit=initialFields[fieldName].split(",");
+    if (initialValueSplit.contains(newFields[fieldName]))
+    {
+      // the field is already contained in the list, so no need to add it
+      mergedFields[fieldName]=initialFields[fieldName];
+      return;
+    }
+    // need to concatenate the new value to the initial
+    mergedFields[fieldName]=initialFields[fieldName]+", "+newFields[fieldName];
+  }
+   
 };
 
 #endif
