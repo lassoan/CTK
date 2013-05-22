@@ -46,7 +46,7 @@ public:
   ///
   Q_INVOKABLE void setDatabase(ctkDICOMDatabase* database);
   Q_INVOKABLE QStringList getRequiredTags();
-  Q_INVOKABLE void updateDisplayFieldsForInstance(QString fileName,
+  Q_INVOKABLE void updateDisplayFieldsForInstance(QString sopInstanceUID,
                                                   QMap<QString, QString> &displayFieldsForCurrentSeries,
                                                   QMap<QString, QString> &displayFieldsForCurrentStudy,
                                                   QMap<QString, QString> &displayFieldsForCurrentPatient);
