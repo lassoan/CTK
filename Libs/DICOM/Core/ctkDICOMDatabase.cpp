@@ -40,6 +40,8 @@
 
 #include "ctkLogger.h"
 
+#include "ctkDICOMDisplayedFieldGenerator.h"
+
 // DCMTK includes
 #include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcfilefo.h>
@@ -119,6 +121,8 @@ public:
   QMap<QString, QString> LoadedHeader;
 
   ctkDICOMAbstractThumbnailGenerator* thumbnailGenerator;
+
+  ctkDICOMDisplayedFieldGenerator DisplayedFieldGenerator;
 
   /// these are for optimizing the import of image sequences
   /// since most information are identical for all slices
@@ -309,6 +313,8 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     {
     this->initializeTagCache();
     }
+  
+  setTagsToPrecache(d->DisplayedFieldGenerator.getRequiredTags());
 }
 
 
@@ -1608,5 +1614,17 @@ bool ctkDICOMDatabase::cacheTag(const QString sopInstanceUID, const QString tag,
 //------------------------------------------------------------------------------
 void ctkDICOMDatabase::updateDisplayedFields()
 {
+  Q_D(ctkDICOMDatabase);
   // TODO: implement this
+  /*    
+    Initialize input from existing content in DB.
+    Store all content to be updated in QStringList objects (for each patient, study, series), update them with the rules.
+    Write the content back to the database.
+
+    For each file:
+     patientFields = if not retrieved from DB then read from DB, if retrieved already, then use that (may already contain updated info)
+     dicomTags = includes patient, study, series UIDs and all the required fields
+     d->DisplayedFieldGenerator.getDisplayedFields(dicomTags, patientFields, studyFields, seriesFields);
+    At the end: update the DB with the patientFields, studyFields, seriesFields
+  */
 }

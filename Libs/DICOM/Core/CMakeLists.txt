@@ -32,6 +32,8 @@ set(KIT_SRCS
   ctkDICOMDatabase.h
   ctkDICOMDataset.cpp
   ctkDICOMDataset.h
+  ctkDICOMDisplayedFieldGenerator.cpp
+  ctkDICOMDisplayedFieldGenerator.h
   ctkDICOMFilterProxyModel.cpp
   ctkDICOMFilterProxyModel.h
   ctkDICOMIndexer.cpp
@@ -64,6 +66,8 @@ set_source_files_properties(
 set(KIT_MOC_SRCS
   ctkDICOMAbstractThumbnailGenerator.h
   ctkDICOMDatabase.h
+  ctkDICOMDisplayedFieldGenerator.h
+  ctkDICOMDisplayedFieldGenerator_p.h
   ctkDICOMIndexer.h
   ctkDICOMIndexer_p.h
   ctkDICOMFilterProxyModel.h
