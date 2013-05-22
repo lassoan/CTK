@@ -43,8 +43,8 @@ ctkDICOMDisplayedFieldGeneratorPrivate::ctkDICOMDisplayedFieldGeneratorPrivate(c
   ,Database(NULL)
 {
   // register commonly used rules
-  AllRules.prepend(new ctkDICOMDisplayedFieldGeneratorDefaultRule);
-  AllRules.prepend(new ctkDICOMDisplayedFieldGeneratorRadiotherapySeriesDescriptionRule);
+  AllRules.append(new ctkDICOMDisplayedFieldGeneratorDefaultRule);
+  AllRules.append(new ctkDICOMDisplayedFieldGeneratorRadiotherapySeriesDescriptionRule);
 
   foreach(ctkDICOMDisplayedFieldGeneratorAbstractRule* rule, AllRules)
   {

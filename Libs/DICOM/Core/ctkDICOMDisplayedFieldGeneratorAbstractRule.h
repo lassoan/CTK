@@ -88,7 +88,7 @@ public:
     if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
     {
       // no new value is defined for this value, keep the initial value (if exists)
-      if (isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
+      if (!isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
       {
         mergedFields[fieldName]=initialFields[fieldName];
       }
@@ -97,7 +97,7 @@ public:
     if (isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
     {
       // no initial value is defined for this value, use just the new value (if exists)
-      if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
+      if (!isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
       {
         mergedFields[fieldName]=newFields[fieldName];
       }
@@ -113,7 +113,7 @@ public:
     if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
     {
       // no new value is defined for this value, keep the initial value (if exists)
-      if (isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
+      if (!isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
       {
         mergedFields[fieldName]=initialFields[fieldName];
       }
@@ -122,7 +122,7 @@ public:
     if (isFieldEmpty(fieldName, initialFields, emptyValuesForEachField))
     {
       // no initial value is defined for this value, use just the new value (if exists)
-      if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
+      if (!isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
       {
         mergedFields[fieldName]=newFields[fieldName];
       }

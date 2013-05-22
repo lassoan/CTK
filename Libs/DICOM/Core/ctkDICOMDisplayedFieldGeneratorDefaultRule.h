@@ -110,21 +110,24 @@ public:
     QMap<QString, QString> &mergedFieldsSeries, QMap<QString, QString> &mergedFieldsStudy, QMap<QString, QString> &mergedFieldsPatient
     )
   {
-    /*
-    TODO: uncomment this
-    mergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
-    mergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
 
-    mergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, DEFAULT_EMPTY_NAME);
-    mergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    mergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    mergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    mergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    // TODO: get the real empty fields list from somewhere
+    QMap<QString, QString> emptyFieldsPatient;
+    QMap<QString, QString> emptyFieldsStudy;
+    QMap<QString, QString> emptyFieldsSeries;
 
-    mergeExpectSameValue("SeriesNumber", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    mergeConcatenate("SeriesDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    mergeExpectSameValue("Modality", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    */
+    mergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
+    mergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
+
+    mergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+
+    mergeExpectSameValue("SeriesNumber", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+    mergeConcatenate("SeriesDescription", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+    mergeExpectSameValue("Modality", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
   }
 
 };

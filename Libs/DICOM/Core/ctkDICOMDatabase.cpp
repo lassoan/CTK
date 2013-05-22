@@ -345,7 +345,6 @@ ctkDICOMDatabase::ctkDICOMDatabase(QString databaseFile)
   Q_D(ctkDICOMDatabase);
   d->registerCompressionLibraries();
   d->init(databaseFile);
-  d->DisplayedFieldGenerator.setDatabase(this);
 }
 
 ctkDICOMDatabase::ctkDICOMDatabase(QObject* parent)
@@ -1674,6 +1673,8 @@ void ctkDICOMDatabase::updateDisplayedFields()
   QMap<QString, QMap<QString, QString> > displayFieldsMapStudy;
   QMap<QString, QMap<QString, QString> > displayFieldsMapSeries;
   d->getDisplayFieldsCache(displayFieldsMapPatient, displayFieldsMapStudy, displayFieldsMapSeries);
+
+  d->DisplayedFieldGenerator.setDatabase(this);
 
   // Get display names for newly added files and add them into the display tables
   while (newFilesQuery.next())
