@@ -103,18 +103,21 @@ public:
     QMap<QString, QString> &mergedFieldsSeries, QMap<QString, QString> &mergedFieldsStudy, QMap<QString, QString> &mergedFieldsPatient
     )
   {
-    MergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
-    MergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
+    /*
+    TODO: uncomment this
+    mergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
+    mergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
 
-    MergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    MergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    MergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    MergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    MergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    mergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, DEFAULT_EMPTY_NAME);
+    mergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    mergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    mergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    mergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
 
-    MergeExpectSameValue("SeriesNumber", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    MergeConcatenate("SeriesDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
-    MergeExpectSameValue("Modality", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    mergeExpectSameValue("SeriesNumber", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    mergeConcatenate("SeriesDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    mergeExpectSameValue("Modality", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    */
   }
 
 };
