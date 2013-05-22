@@ -120,6 +120,13 @@ public:
                               QMap<QString, QMap<QString, QString> > &displayFieldsMapSeries );
 
   ///
+  /// TODO
+  ///
+  void applyDisplayFieldsChanges( QMap<QString, QMap<QString, QString> > &displayFieldsMapPatient,
+                                  QMap<QString, QMap<QString, QString> > &displayFieldsMapStudy,
+                                  QMap<QString, QMap<QString, QString> > &displayFieldsMapSeries );
+
+  ///
   /// get all Filename values from table
   QStringList filenames(QString table);
 
@@ -1629,7 +1636,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
 
   // Get the files for which the display fields have not been created yet (DisplayedFieldsUpdatedTimestamp is NULL)
   QSqlQuery newFilesQuery(d->Database);
-  d->loggedExec(newFilesQuery,QString("SELECT SOPInstanceUID, SeriesInstanceUID FROM Images WHERE DisplayedFieldsUpdatedTimestamp = NULL;"));
+  d->loggedExec(newFilesQuery,QString("SELECT SOPInstanceUID, SeriesInstanceUID FROM Images WHERE DisplayedFieldsUpdatedTimestamp IS NULL;"));
 
   // Populate display fields maps from the current display tables
   QMap<QString, QMap<QString, QString> > displayFieldsMapPatient;
@@ -1652,59 +1659,11 @@ void ctkDICOMDatabase::updateDisplayedFields()
     displayFieldsMapPatient[ displayFieldsForCurrentStudy["PatientsUID"] ] = displayFieldsForCurrentPatient;
   }
 
-  // Assemble field lists
-  QString displayPatientsFieldList;
-  QString displayStudiesFieldList;
-  QString displaySeriesFieldList;
-  foreach (QString tagName, displayFieldsMapPatient.begin()->keys())
+  // Update/insert the display values
+  if (displayFieldsMapSeries.count() > 0)
   {
-    displayPatientsFieldList = QString("'" + tagName + "', ");
+    d->applyDisplayFieldsChanges(displayFieldsMapPatient, displayFieldsMapStudy, displayFieldsMapSeries);
   }
-  foreach (QString tagName, displayFieldsMapStudy.begin()->keys())
-  {
-    displayStudiesFieldList = QString("'" + tagName + "', ");
-  }
-  foreach (QString tagName, displayFieldsMapSeries.begin()->keys())
-  {
-    displaySeriesFieldList = QString("'" + tagName + "', ");
-  }
-  // Trim the separators from the end
-  displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
-  displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
-  displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
-
-  //  else if (!tableFieldPair[0].compare("DisplayStudies"))
-  //  {
-  //    displayStudiesFieldList = QString("'" + tableFieldPair[1] + "', ");
-  //    displayStudiesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
-  //  }
-  //  else if (!tableFieldPair[0].compare("DisplaySeries"))
-  //  {
-  //    displaySeriesFieldList = QString("'" + tableFieldPair[1] + "', ");
-  //    displaySeriesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
-  //  }
-  //  displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
-  //  displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
-  //  displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
-
-  //// Update/insert the updated display values
-  //foreach (QMap<QString, QString> currentPatient in displayFieldsMapPatient)
-  //{
-  //  // Insert row into DisplayPatients if does not exist
-  //  QSqlQuery displayPatientsQuery(d->Database);
-  //  QSqlQuery updateDisplayPatientStatement(d->Database);
-  //  displayPatientsQuery.prepare( QString("SELECT UID FROM DisplayPatients WHERE UID = %1 ;").arg(currentPatient["UID"]) );
-  //  if (!displayPatientsQuery.next())
-  //  {
-  //    updateDisplayPatientStatement.prepare ( "INSERT INTO DisplayPatients (?) values (?)" );
-  //  }
-  //  else
-  //  {
-  //  }
-  //  updateDisplayPatientStatement.bindValue ( 0, displayPatientsFieldList );
-  //  updateDisplayPatientStatement.bindValue ( 1, displayPatientsValueList );
-  //  d->loggedExec(updateDisplayPatientStatement);
-  //}
 }
 
 //------------------------------------------------------------------------------
@@ -1758,5 +1717,131 @@ void ctkDICOMDatabasePrivate::getDisplayFieldsCache( QMap<QString, QMap<QString,
       patientFieldsMap.insert(patientRecord.fieldName(fieldIndex), patientRecord.value(fieldIndex).toString());
     }
     displayFieldsMapPatient.insert(patientInstanceUID, patientFieldsMap);
+  }
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QString, QString> > &displayFieldsMapPatient,
+                                                         QMap<QString, QMap<QString, QString> > &displayFieldsMapStudy,
+                                                         QMap<QString, QMap<QString, QString> > &displayFieldsMapSeries )
+{
+  foreach (QString currentPatientUid, displayFieldsMapPatient.keys())
+  {
+    // Insert row into DisplayPatients if does not exist
+    QMap<QString, QString> currentPatient = displayFieldsMapPatient[currentPatientUid];
+    QSqlQuery displayPatientsQuery(Database);
+    QSqlQuery applyDisplayPatientChangesStatement(Database);
+    displayPatientsQuery.prepare( QString("SELECT UID FROM DisplayPatients WHERE UID = %1 ;").arg(currentPatient["UID"]) );
+    if (!displayPatientsQuery.next())
+    {
+      QString displayPatientsFieldList, displayPatientsValueList;
+      foreach (QString tagName, currentPatient.keys())
+      {
+        displayPatientsFieldList.append( "'" + tagName + "', " );
+        displayPatientsValueList.append( currentPatient[tagName] + ", " );
+      }
+      // Trim the separators from the end
+      displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
+      displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
+
+      applyDisplayPatientChangesStatement.prepare ( "INSERT INTO DisplayPatients (?) values (?);" );
+      applyDisplayPatientChangesStatement.bindValue ( 0, displayPatientsFieldList );
+      applyDisplayPatientChangesStatement.bindValue ( 1, displayPatientsValueList );
+    }
+    else // Update if it already exists
+    {
+      QString displayPatientsFieldUpdateList;
+      foreach (QString tagName, currentPatient.keys())
+      {
+        displayPatientsFieldUpdateList.append( tagName + "=" + currentPatient[tagName] + ", " );
+      }
+      // Trim the separators from the end
+      displayPatientsFieldUpdateList = displayPatientsFieldUpdateList.left(displayPatientsFieldUpdateList.size() - 2);
+
+      applyDisplayPatientChangesStatement.prepare ( "UPDATE table_name SET (?) WHERE UID=(?);" );
+      applyDisplayPatientChangesStatement.bindValue ( 0, displayPatientsFieldUpdateList );
+      applyDisplayPatientChangesStatement.bindValue ( 1, currentPatient["UID"] );
+    }
+    loggedExec(applyDisplayPatientChangesStatement);
+  }
+
+  foreach (QString currentStudyInstanceUid, displayFieldsMapStudy.keys())
+  {
+    // Insert row into DisplayStudies if does not exist
+    QMap<QString, QString> currentStudy = displayFieldsMapStudy[currentStudyInstanceUid];
+    QSqlQuery displayStudiesQuery(Database);
+    QSqlQuery applyDisplayStudyChangesStatement(Database);
+    displayStudiesQuery.prepare( QString("SELECT UID FROM DisplayStudies WHERE UID = %1 ;").arg(currentStudy["UID"]) );
+    if (!displayStudiesQuery.next())
+    {
+      QString displayStudiesFieldList, displayStudiesValueList;
+      foreach (QString tagName, currentStudy.keys())
+      {
+        displayStudiesFieldList.append( "'" + tagName + "', " );
+        displayStudiesValueList.append( currentStudy[tagName] + ", " );
+      }
+      // Trim the separators from the end
+      displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
+      displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
+
+      applyDisplayStudyChangesStatement.prepare ( "INSERT INTO DisplayStudies (?) values (?);" );
+      applyDisplayStudyChangesStatement.bindValue ( 0, displayStudiesFieldList );
+      applyDisplayStudyChangesStatement.bindValue ( 1, displayStudiesValueList );
+    }
+    else // Update if it already exists
+    {
+      QString displayStudiesFieldUpdateList;
+      foreach (QString tagName, currentStudy.keys())
+      {
+        displayStudiesFieldUpdateList.append( tagName + "=" + currentStudy[tagName] + ", " );
+      }
+      // Trim the separators from the end
+      displayStudiesFieldUpdateList = displayStudiesFieldUpdateList.left(displayStudiesFieldUpdateList.size() - 2);
+
+      applyDisplayStudyChangesStatement.prepare ( "UPDATE table_name SET (?) WHERE UID=(?);" );
+      applyDisplayStudyChangesStatement.bindValue ( 0, displayStudiesFieldUpdateList );
+      applyDisplayStudyChangesStatement.bindValue ( 1, currentStudy["UID"] );
+    }
+    loggedExec(applyDisplayStudyChangesStatement);
+  }
+
+  foreach (QString currentSeriesInstanceUid, displayFieldsMapSeries.keys())
+  {
+    // Insert row into DisplaySeries if does not exist
+    QMap<QString, QString> currentSeries = displayFieldsMapSeries[currentSeriesInstanceUid];
+    QSqlQuery displaySeriesQuery(Database);
+    QSqlQuery applyDisplaySeriesChangesStatement(Database);
+    displaySeriesQuery.prepare( QString("SELECT UID FROM DisplaySeries WHERE UID = %1 ;").arg(currentSeries["UID"]) );
+    if (!displaySeriesQuery.next())
+    {
+      QString displaySeriesFieldList, displaySeriesValueList;
+      foreach (QString tagName, currentSeries.keys())
+      {
+        displaySeriesFieldList.append( "'" + tagName + "', " );
+        displaySeriesValueList.append( currentSeries[tagName] + ", " );
+      }
+      // Trim the separators from the end
+      displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
+      displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
+
+      applyDisplaySeriesChangesStatement.prepare ( "INSERT INTO DisplaySeries (?) values (?);" );
+      applyDisplaySeriesChangesStatement.bindValue ( 0, displaySeriesFieldList );
+      applyDisplaySeriesChangesStatement.bindValue ( 1, displaySeriesValueList );
+    }
+    else // Update if it already exists
+    {
+      QString displaySeriesFieldUpdateList;
+      foreach (QString tagName, currentSeries.keys())
+      {
+        displaySeriesFieldUpdateList.append( tagName + "=" + currentSeries[tagName] + ", " );
+      }
+      // Trim the separators from the end
+      displaySeriesFieldUpdateList = displaySeriesFieldUpdateList.left(displaySeriesFieldUpdateList.size() - 2);
+
+      applyDisplaySeriesChangesStatement.prepare ( "UPDATE table_name SET (?) WHERE UID=(?);" );
+      applyDisplaySeriesChangesStatement.bindValue ( 0, displaySeriesFieldUpdateList );
+      applyDisplaySeriesChangesStatement.bindValue ( 1, currentSeries["UID"] );
+    }
+    loggedExec(applyDisplaySeriesChangesStatement);
   }
 }
