@@ -117,7 +117,8 @@ void ctkDICOMDisplayedFieldGenerator::updateDisplayFieldsForInstance( QString so
     rule->mergeDisplayFieldsForInstance(
       initialFieldsSeries, initialFieldsStudy, initialFieldsPatient, // original DB contents
       newFieldsSeries, newFieldsStudy, newFieldsPatient, // new value
-      displayFieldsForCurrentSeries, displayFieldsForCurrentStudy, displayFieldsForCurrentPatient // new DB contents
+      displayFieldsForCurrentSeries, displayFieldsForCurrentStudy, displayFieldsForCurrentPatient, // new DB contents
+      d->EmptyFieldNamesDisplaySeries, d->EmptyFieldNamesDisplayStudies, d->EmptyFieldNamesDisplayPatients // empty field names defined by all the rules
       );   
   }
 }
