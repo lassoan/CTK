@@ -60,6 +60,16 @@ public:
     return QString("%1,%2").arg(tag.getGroup(),4,16,QLatin1Char('0')).arg(tag.getElement(),4,16,QLatin1Char('0'));
   }  
 
+  static void MergeExpectSameValue(QString key, const QMap<QString, QString> &initialFields, const QMap<QString, QString> &newFields, const QMap<QString, QString> &mergedFields)
+  {
+    // TODO: to be implemented
+  }
+
+  static void MergeConcatenate(QString key, const QMap<QString, QString> &initialFields, const QMap<QString, QString> &newFields, const QMap<QString, QString> &mergedFields)
+  {
+    // TODO: to be implemented
+  }
+   
 };
 
 #endif

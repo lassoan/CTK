@@ -83,7 +83,18 @@ public:
 
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)
   {
-    // TODO: implement this
+    displayFieldsForCurrentPatient["PatientName"]=cachedTags[dicomTagToString(DCM_PatientName)];    
+    displayFieldsForCurrentPatient.insert("PatientID",cachedTags[dicomTagToString(DCM_PatientID)]);
+
+    displayFieldsForCurrentStudy.insert("StudyDescription",cachedTags[dicomTagToString(DCM_StudyDescription)]);    
+    displayFieldsForCurrentStudy.insert("StudyDate",cachedTags[dicomTagToString(DCM_StudyDate)]);    
+    displayFieldsForCurrentStudy.insert("ModalitiesInStudy",cachedTags[dicomTagToString(DCM_ModalitiesInStudy)]);    
+    displayFieldsForCurrentStudy.insert("InstitutionName",cachedTags[dicomTagToString(DCM_InstitutionName)]);    
+    displayFieldsForCurrentStudy.insert("ReferringPhysician",cachedTags[dicomTagToString(DCM_ReferringPhysicianName)]);    
+
+    displayFieldsForCurrentSeries.insert("SeriesNumber",cachedTags[dicomTagToString(DCM_SeriesNumber)]);    
+    displayFieldsForCurrentSeries.insert("SeriesDescription",cachedTags[dicomTagToString(DCM_SeriesDescription)]);    
+    displayFieldsForCurrentSeries.insert("Modality",cachedTags[dicomTagToString(DCM_Modality)]);    
   }
 
   virtual void mergeDisplayFieldsForInstance(
@@ -92,9 +103,19 @@ public:
     QMap<QString, QString> &mergedFieldsSeries, QMap<QString, QString> &mergedFieldsStudy, QMap<QString, QString> &mergedFieldsPatient
     )
   {
-    // TODO: implement this
-  }
+    MergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
+    MergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient);
 
+    MergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    MergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    MergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    MergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    MergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+
+    MergeExpectSameValue("SeriesNumber", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    MergeConcatenate("SeriesDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+    MergeExpectSameValue("Modality", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy);
+  }
 
 };
 
