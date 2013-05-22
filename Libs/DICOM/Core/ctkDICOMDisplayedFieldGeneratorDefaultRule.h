@@ -26,6 +26,8 @@
 
 #include "ctkDICOMDisplayedFieldGeneratorAbstractRule.h"
 
+#define EMPTY_SERIES_DESCRIPTION "Unnamed Series"
+
 /// \ingroup DICOM_Core
 ///
 /// Default rule for generating displayed fields from DICOM fields
@@ -79,6 +81,11 @@ public:
     requiredTags << dicomTagToString(DCM_TemporalPositionIdentifier);   
 
     return requiredTags;
+  }
+
+  virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldNamesDisplayPatients, QMap<QString, QString> emptyFieldNamesDisplayStudies, QMap<QString, QString> emptyFieldNamesDisplaySeries)
+  {
+    emptyFieldNamesDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION);
   }
 
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)

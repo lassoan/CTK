@@ -23,6 +23,8 @@
 
 #include <QObject>
 #include <QList>
+#include <QMap>
+#include <QString>
 
 #include "ctkDICOMDisplayedFieldGenerator.h"
 
@@ -46,6 +48,10 @@ public:
 public:
   QList<ctkDICOMDisplayedFieldGeneratorAbstractRule*> AllRules;
   ctkDICOMDatabase* Database;
+
+  QMap<QString, QString> EmptyFieldNamesDisplayPatients;
+  QMap<QString, QString> EmptyFieldNamesDisplayStudies;
+  QMap<QString, QString> EmptyFieldNamesDisplaySeries;
 };
 
 

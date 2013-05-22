@@ -44,7 +44,7 @@ public:
     RULE_APPLIED_CONTINUE_PROCESSING,
     RULE_APPLIED_STOP_PROCESSING
   };
-  
+
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)=0;
 
   virtual void mergeDisplayFieldsForInstance(
@@ -59,6 +59,8 @@ public:
   {    
     return QString("%1,%2").arg(tag.getGroup(),4,16,QLatin1Char('0')).arg(tag.getElement(),4,16,QLatin1Char('0'));
   }  
+
+  virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldNamesDisplayPatients, QMap<QString, QString> emptyFieldNamesDisplayStudies, QMap<QString, QString> emptyFieldNamesDisplaySeries)=0;
 
   static bool isFieldEmpty(const QString &fieldName, const QMap<QString, QString> &fields, const QMap<QString, QString> &emptyValuesForEachField)
   {

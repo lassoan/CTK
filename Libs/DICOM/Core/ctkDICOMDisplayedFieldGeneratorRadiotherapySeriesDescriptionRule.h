@@ -26,12 +26,16 @@
 
 #include "ctkDICOMDisplayedFieldGeneratorAbstractRule.h"
 
+#define EMPTY_SERIES_DESCRIPTION_RTPLAN "Unnamed RT Plan"
+#define EMPTY_SERIES_DESCRIPTION_RTSTRUCT "Unnamed RT Structure Set"
+#define EMPTY_SERIES_DESCRIPTION_RTIMAGE "Unnamed RT Image"
+
 /// \ingroup DICOM_Core
 ///
 /// Default rule for generating displayed fields from DICOM fields
 class CTK_DICOM_CORE_EXPORT ctkDICOMDisplayedFieldGeneratorRadiotherapySeriesDescriptionRule : public ctkDICOMDisplayedFieldGeneratorAbstractRule
 {
-public: 
+public:
   virtual EvaluationResult evaluate(QStringList dicomFields, QMap<QString, QString> displayedFields, const ctkDICOMDatabase &db)
   {
     // TODO: fill default patient, study, series tables
@@ -51,22 +55,74 @@ public:
     //requiredTags << dicomTagToString(DCM_RTPlanTime);
     //requiredTags << dicomTagToString(DCM_RTPlanDescription);    
     
-    requiredTags << dicomTagToString(DCM_StructureSetLabel);
     requiredTags << dicomTagToString(DCM_StructureSetName);
+    requiredTags << dicomTagToString(DCM_StructureSetLabel);
     //requiredTags << dicomTagToString(DCM_StructureSetDescription);
     //requiredTags << dicomTagToString(DCM_StructureSetDate);
     //requiredTags << dicomTagToString(DCM_StructureSetTime);
           
-    requiredTags << dicomTagToString(DCM_RTImageLabel);
     requiredTags << dicomTagToString(DCM_RTImageName);
+    requiredTags << dicomTagToString(DCM_RTImageLabel);
     requiredTags << dicomTagToString(DCM_RTImageDescription);
           
     return requiredTags;
   }
 
+  virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldNamesDisplayPatients, QMap<QString, QString> emptyFieldNamesDisplayStudies, QMap<QString, QString> emptyFieldNamesDisplaySeries)
+  {
+    emptyFieldNamesDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION_RTPLAN);
+    emptyFieldNamesDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION_RTSTRUCT);
+    emptyFieldNamesDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION_RTIMAGE);
+  }
+
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)
   {
-    // TODO: implement this
+    QString modality = cachedTags[dicomTagToString(DCM_Modality)];
+    if (modality.compare("RTPLAN"))
+    {
+      if (!cachedTags[dicomTagToString(DCM_RTPlanName)].isEmpty())
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_RTPlanName)];
+      }
+      else if (!cachedTags[dicomTagToString(DCM_RTPlanLabel)].isEmpty())
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_RTPlanLabel)];
+      }
+      else
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = QString(EMPTY_SERIES_DESCRIPTION_RTPLAN);
+      }
+    }
+    else if (modality.compare("RTSTRUCT"))
+    {
+      if (!cachedTags[dicomTagToString(DCM_StructureSetName)].isEmpty())
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_StructureSetName)];
+      }
+      else if (!cachedTags[dicomTagToString(DCM_StructureSetLabel)].isEmpty())
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_StructureSetLabel)];
+      }
+      else
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = QString(EMPTY_SERIES_DESCRIPTION_RTSTRUCT);
+      }
+    }
+    else if (modality.compare("RTIMAGE"))
+    {
+      if (!cachedTags[dicomTagToString(DCM_RTImageName)].isEmpty())
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_RTImageName)];
+      }
+      else if (!cachedTags[dicomTagToString(DCM_RTImageLabel)].isEmpty())
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_RTImageLabel)];
+      }
+      else
+      {
+        displayFieldsForCurrentSeries["SeriesDescription"] = QString(EMPTY_SERIES_DESCRIPTION_RTIMAGE);
+      }
+    }
   }
 
   virtual void mergeDisplayFieldsForInstance(
@@ -77,7 +133,6 @@ public:
   {
     // TODO: implement this
   }
-
 
 };
 
