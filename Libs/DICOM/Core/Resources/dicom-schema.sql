@@ -80,7 +80,7 @@ CREATE INDEX IF NOT EXISTS 'StudiesPatientIndex' ON 'Studies' ('PatientsUID');
 CREATE TABLE 'DisplayPatients' (
   'UID' INT NOT NULL,
   'PatientName' VARCHAR(255) NULL ,
-  'MRN' VARCHAR(255) NULL ,
+  'PatientID' VARCHAR(255) NULL ,
   'NumberOfStudies' INT NULL ,
   PRIMARY KEY ('UID') );
 CREATE TABLE 'DisplayStudies' (

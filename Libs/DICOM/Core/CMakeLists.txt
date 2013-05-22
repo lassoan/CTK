@@ -49,6 +49,9 @@ set(KIT_SRCS
   ctkDICOMRetrieve.h
   ctkDICOMTester.cpp
   ctkDICOMTester.h
+  ctkDICOMDisplayedFieldGeneratorAbstractRule.h
+  ctkDICOMDisplayedFieldGeneratorDefaultRule.h
+  ctkDICOMDisplayedFieldGeneratorRadiotherapySeriesDescriptionRule.h
 )
 
 if(DCMTK_VERSION_IS_360)
