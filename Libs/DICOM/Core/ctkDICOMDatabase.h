@@ -231,7 +231,7 @@ public:
   Q_INVOKABLE bool initializeTagCache ();
   /// Return the value of a cached tag
   Q_INVOKABLE QString cachedTag (const QString sopInstanceUID, const QString tag);
-  /// Return the list of all cached tags and values for the specified sopInstanceUID
+  /// Return the list of all cached tags and values for the specified sopInstanceUID. Returns with empty string if the tag is not present in the cache.
   Q_INVOKABLE void getCachedTags(const QString sopInstanceUID, QMap<QString, QString> &cachedTags);
   /// Insert an instance tag's value into to the cache
   Q_INVOKABLE bool cacheTag (const QString sopInstanceUID, const QString tag, const QString value);

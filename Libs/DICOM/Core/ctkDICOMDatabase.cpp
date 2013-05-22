@@ -1627,10 +1627,10 @@ void ctkDICOMDatabase::getCachedTags(const QString sopInstanceUID, QMap<QString,
     {
     tag = selectValue.value(0).toString();
     value = selectValue.value(1).toString();
-    if (value == QString(""))
-      {
-      value = ValueIsEmptyString;
-      }
+    if (value == TagNotInInstance || value == ValueIsEmptyString)
+    {
+      value = QString("");
+    }
     cachedTags.insert(tag, value);
     }
 }
@@ -1666,6 +1666,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
 
   // Get the files for which the display fields have not been created yet (DisplayedFieldsUpdatedTimestamp is NULL)
   QSqlQuery newFilesQuery(d->Database);
+  //TODO: handle cases when the values actually changed; now we only do insertion in the database
   d->loggedExec(newFilesQuery,QString("SELECT SOPInstanceUID, SeriesInstanceUID FROM Images WHERE DisplayedFieldsUpdatedTimestamp IS NULL;"));
 
   // Populate display fields maps from the current display tables
@@ -1772,7 +1773,7 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       foreach (QString tagName, currentPatient.keys())
       {
         displayPatientsFieldList.append( "'" + tagName + "', " );
-        displayPatientsValueList.append( "'" + currentPatient[tagName] + "', " );
+        displayPatientsValueList.append( currentPatient[tagName].isEmpty() ? "NULL, " : "'" + currentPatient[tagName] + "', " );
       }
       // Trim the separators from the end
       displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 2);
@@ -1812,7 +1813,7 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       foreach (QString tagName, currentStudy.keys())
       {
         displayStudiesFieldList.append( "'" + tagName + "', " );
-        displayStudiesValueList.append( "'" + currentStudy[tagName] + "', " );
+        displayStudiesValueList.append( currentStudy[tagName].isEmpty() ? "NULL, " : "'" + currentStudy[tagName] + "', " );
       }
       // Trim the separators from the end
       displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 2);
@@ -1852,7 +1853,7 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       foreach (QString tagName, currentSeries.keys())
       {
         displaySeriesFieldList.append( "'" + tagName + "', " );
-        displaySeriesValueList.append( "'" + currentSeries[tagName] + "', " );
+        displaySeriesValueList.append( currentSeries[tagName].isEmpty() ? "NULL, " : "'" + currentSeries[tagName] + "', " );
       }
       // Trim the separators from the end
       displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 2);
