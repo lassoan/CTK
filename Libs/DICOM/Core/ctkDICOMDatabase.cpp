@@ -62,12 +62,15 @@
 static ctkLogger logger("org.commontk.dicom.DICOMDatabase" );
 //------------------------------------------------------------------------------
 
-// Flag for tag cache to avoid repeated serarches for
+// Flag for tag cache to avoid repeated searches for
 // tags that do no exist.
 static QString TagNotInInstance("__TAG_NOT_IN_INSTANCE__");
 // Flag for tag cache indicating that the value
 // really is the empty string
 static QString ValueIsEmptyString("__VALUE_IS_EMPTY_STRING__");
+// Separator character for table and field names to be used in
+// display rules manager
+static QString TableFieldSeparator(":");
 
 //------------------------------------------------------------------------------
 class ctkDICOMDatabasePrivate
@@ -329,6 +332,7 @@ ctkDICOMDatabase::ctkDICOMDatabase(QString databaseFile)
   Q_D(ctkDICOMDatabase);
   d->registerCompressionLibraries();
   d->init(databaseFile);
+  d->DisplayedFieldGenerator.setDatabase(this);
 }
 
 ctkDICOMDatabase::ctkDICOMDatabase(QObject* parent)
@@ -480,7 +484,7 @@ QString ctkDICOMDatabase::schemaVersion()
   //   so that the ctkDICOMDatabasePrivate::filenames method
   //   still works.
   //
-  return QString("0.5.3");
+  return QString("0.6.0");
 };
 
 //------------------------------------------------------------------------------
@@ -805,7 +809,7 @@ QString ctkDICOMDatabase::fileValue(const QString fileName, const unsigned short
   // - if so, are we looking for a group/element that is past the last one
   //   accessed
   //   -- if so, keep looking for the requested group/element
-  //   -- if not, start again from the begining
+  //   -- if not, start again from the beginning
 
   QString tag = this->groupElementToTag(group, element);
   QString sopInstanceUID = this->instanceForFile(fileName);
@@ -1174,7 +1178,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMDataset& ctkDataset, const Q
       return;
     }
 
-  // store the file if the database is not in memomry
+  // store the file if the database is not in memory
   // TODO: if we are called from insert(file) we
   // have to do something else
   //
@@ -1226,7 +1230,8 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMDataset& ctkDataset, const Q
       if ( LastPatientID != patientID
            || LastPatientsBirthDate != patientsBirthDate
            || LastPatientsName != patientsName )
-        {  QString seriesInstanceUID(ctkDataset.GetElementAsString(DCM_SeriesInstanceUID) );
+        {  
+          QString seriesInstanceUID(ctkDataset.GetElementAsString(DCM_SeriesInstanceUID) );
 
           qDebug() << "This looks like a different patient from last insert: " << patientID;
           // Ok, something is different from last insert, let's insert him if he's not
@@ -1250,7 +1255,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMDataset& ctkDataset, const Q
           insertStudy(ctkDataset,dbPatientID);
         }
 
-      if ( seriesInstanceUID != "" && seriesInstanceUID != LastSeriesInstanceUID )
+      if ( seriesInstanceUID != "" && LastSeriesInstanceUID != seriesInstanceUID )
         {
           insertSeries(ctkDataset, studyInstanceUID);
         }
@@ -1615,16 +1620,85 @@ bool ctkDICOMDatabase::cacheTag(const QString sopInstanceUID, const QString tag,
 void ctkDICOMDatabase::updateDisplayedFields()
 {
   Q_D(ctkDICOMDatabase);
-  // TODO: implement this
-  /*    
-    Initialize input from existing content in DB.
-    Store all content to be updated in QStringList objects (for each patient, study, series), update them with the rules.
-    Write the content back to the database.
 
-    For each file:
-     patientFields = if not retrieved from DB then read from DB, if retrieved already, then use that (may already contain updated info)
-     dicomTags = includes patient, study, series UIDs and all the required fields
-     d->DisplayedFieldGenerator.getDisplayedFields(dicomTags, patientFields, studyFields, seriesFields);
-    At the end: update the DB with the patientFields, studyFields, seriesFields
-  */
+  // Get the files for which the display fields have not been created yet (DisplayedFieldsUpdatedTimestamp is NULL)
+  QSqlQuery newFilesQuery(d->Database);
+  d->loggedExec(newFilesQuery,QString("SELECT Filename FROM Images WHERE DisplayedFieldsUpdatedTimestamp = NULL;"));
+  
+  // Get display names for newly added files and add them into the display tables
+  while (newFilesQuery.next())
+  {
+    QMap<QString, QString> displayFieldsMap;
+    d->DisplayedFieldGenerator.displayFieldsForFile(newFilesQuery.value(0).toString(), displayFieldsMap);
+
+    // Assemble insert statements
+    QString displayPatientsFieldList, displayPatientsValueList;
+    QString displayStudiesFieldList, displayStudiesValueList;
+    QString displaySeriesFieldList, displaySeriesValueList;
+    foreach (QString tableAndFieldString, displayFieldsMap)
+    {
+      QStringList tableFieldPair = tableAndFieldString.split(TableFieldSeparator);
+      if (!tableFieldPair[0].compare("DisplayPatients"))
+      {
+        displayPatientsFieldList = QString("'" + tableFieldPair[1] + "', ");
+        displayPatientsValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
+      }
+      else if (!tableFieldPair[0].compare("DisplayStudies"))
+      {
+        displayStudiesFieldList = QString("'" + tableFieldPair[1] + "', ");
+        displayStudiesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
+      }
+      else if (!tableFieldPair[0].compare("DisplaySeries"))
+      {
+        displaySeriesFieldList = QString("'" + tableFieldPair[1] + "', ");
+        displaySeriesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
+      }
+    }
+    // Trim the separators from the end
+    displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
+    displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
+    displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
+    displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
+    displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
+    displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
+
+    // Insert row into DisplayPatients if does not exist
+    QSqlQuery displayPatientsQuery(d->Database);
+    d->loggedExec( displayPatientsQuery,QString("SELECT UID FROM DisplayPatients WHERE UID = %1 ;")
+      .arg(QString("DisplayPatients%1UID").arg(TableFieldSeparator)) );
+    if (!displayPatientsQuery.next())
+    {
+      QSqlQuery insertDisplayPatientStatement(d->Database);
+      insertDisplayPatientStatement.prepare ( "INSERT INTO DisplayPatients (?) values (?)" );
+      insertDisplayPatientStatement.bindValue ( 0, displayPatientsFieldList );
+      insertDisplayPatientStatement.bindValue ( 1, displayPatientsValueList );
+      d->loggedExec(insertDisplayPatientStatement);
+    }
+
+    // Insert row into DisplayStudies if does not exist
+    QSqlQuery displayStudiesQuery(d->Database);
+    d->loggedExec( displayStudiesQuery,QString("SELECT StudyInstanceUID FROM DisplayStudies WHERE StudyInstanceUID = %1 ;")
+      .arg(QString("DisplayStudies%1StudyInstanceUID").arg(TableFieldSeparator)) );
+    if (!displayStudiesQuery.next())
+    {
+      QSqlQuery insertDisplayStudiesStatement(d->Database);
+      insertDisplayStudiesStatement.prepare ( "INSERT INTO DisplayStudies (?) values (?)" );
+      insertDisplayStudiesStatement.bindValue ( 0, displayStudiesFieldList );
+      insertDisplayStudiesStatement.bindValue ( 1, displayStudiesValueList );
+      d->loggedExec(insertDisplayStudiesStatement);
+    }
+
+    // Insert row into DisplaySeries if does not exist
+    QSqlQuery displaySeriesQuery(d->Database);
+    d->loggedExec( displaySeriesQuery,QString("SELECT SeriesInstanceUID FROM DisplaySeries WHERE SeriesInstanceUID = %1 ;")
+      .arg(QString("DisplaySeries%1SeriesInstanceUID").arg(TableFieldSeparator)) );
+    if (!displaySeriesQuery.next())
+    {
+      QSqlQuery insertDisplaySeriesStatement(d->Database);
+      insertDisplaySeriesStatement.prepare ( "INSERT INTO DisplaySeries (?) values (?)" );
+      insertDisplaySeriesStatement.bindValue ( 0, displaySeriesFieldList );
+      insertDisplaySeriesStatement.bindValue ( 1, displaySeriesValueList );
+      d->loggedExec(insertDisplaySeriesStatement);
+    }
+  }
 }

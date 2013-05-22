@@ -28,6 +28,7 @@
 #include "ctkDICOMCoreExport.h"
 
 class ctkDICOMDisplayedFieldGeneratorPrivate;
+class ctkDICOMDatabase;
 
 /// \ingroup DICOM_Core
 ///
@@ -43,7 +44,9 @@ public:
   ///
   /// \brief Gets the list of tags required by all the registered rules
   ///
+  Q_INVOKABLE void setDatabase(ctkDICOMDatabase* database);
   Q_INVOKABLE QStringList getRequiredTags();
+  Q_INVOKABLE void displayFieldsForFile(QString fileName, QMap<QString, QString> &displayFieldsMap);
 
 protected:
   QScopedPointer<ctkDICOMDisplayedFieldGeneratorPrivate> d_ptr;

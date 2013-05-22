@@ -39,6 +39,7 @@ static ctkLogger logger("org.commontk.dicom.DICOMDisplayedFieldGenerator" );
 
 //------------------------------------------------------------------------------
 ctkDICOMDisplayedFieldGeneratorPrivate::ctkDICOMDisplayedFieldGeneratorPrivate(ctkDICOMDisplayedFieldGenerator& o) : q_ptr(&o)
+  ,Database(NULL)
 {
   // register commonly used rules
   AllRules.prepend(new ctkDICOMDisplayedFieldGeneratorDefaultRule);
@@ -84,4 +85,17 @@ QStringList ctkDICOMDisplayedFieldGenerator::getRequiredTags()
 
   // TODO: remove duplicates from requiredTags (maybe also sort)
   return requiredTags;
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDisplayedFieldGenerator::displayFieldsForFile(QString fileName, QMap<QString, QString> &displayFieldsMap)
+{
+
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDisplayedFieldGenerator::setDatabase(ctkDICOMDatabase* database)
+{
+  Q_D(ctkDICOMDisplayedFieldGenerator);
+  d->Database=database;
 }
