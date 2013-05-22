@@ -85,6 +85,7 @@ CREATE TABLE 'DisplayPatients' (
   PRIMARY KEY ('UID') );
 CREATE TABLE 'DisplayStudies' (
   'StudyInstanceUID' VARCHAR(64) NOT NULL ,
+  'PatientsUID' INT NOT NULL ,
   'StudyDescription' VARCHAR(255) NULL ,
   'StudyDate' DATE NULL ,
   'ModalitiesInStudy' VARCHAR(255) NULL ,
@@ -93,6 +94,7 @@ CREATE TABLE 'DisplayStudies' (
   PRIMARY KEY ('StudyInstanceUID') );
 CREATE TABLE 'DisplaySeries' (
   'SeriesInstanceUID' VARCHAR(64) NOT NULL ,
+  'StudyInstanceUID' VARCHAR(64) NOT NULL ,
   'SeriesNumber' INT NULL ,
   'SeriesDescription' VARCHAR(255) NULL ,
   'Modality' VARCHAR(20) NULL ,

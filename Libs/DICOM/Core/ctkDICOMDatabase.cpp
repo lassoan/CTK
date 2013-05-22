@@ -74,7 +74,12 @@ static QString TableFieldSeparator(":");
 class ctkDICOMDisplayRuleManager : public QObject
 {
 public:
-  void displayFieldsForFile(QString fileName, QMap<QString, QString> &displayFieldsMap) { };
+  void updateDisplayFieldsForInstance( QString sopInstanceUid,
+    QMap<QString, QString> &displayFieldsMapPatient,
+    QMap<QString, QString> &displayFieldsMapStudy,
+    QMap<QString, QString> &displayFieldsMapSeries ) { };
+
+  void setDatabase(QSqlDatabase &database) { };
 };
 
 //------------------------------------------------------------------------------
@@ -117,6 +122,12 @@ public:
   ///
   void removeBackupFileList();
 
+  ///
+  /// TODO
+  ///
+  void getDisplayFieldsCache( QMap<QString, QMap<QString, QString> > &displayFieldsMapPatient,
+                              QMap<QString, QMap<QString, QString> > &displayFieldsMapStudy,
+                              QMap<QString, QMap<QString, QString> > &displayFieldsMapSeries );
 
   ///
   /// get all Filename values from table
@@ -1623,85 +1634,133 @@ void ctkDICOMDatabase::updateDisplayedFields()
 
   // Get the files for which the display fields have not been created yet (DisplayedFieldsUpdatedTimestamp is NULL)
   QSqlQuery newFilesQuery(d->Database);
-  d->loggedExec(newFilesQuery,QString("SELECT Filename FROM Images WHERE DisplayedFieldsUpdatedTimestamp = NULL;"));
-  
+  d->loggedExec(newFilesQuery,QString("SELECT SOPInstanceUID, SeriesInstanceUID FROM Images WHERE DisplayedFieldsUpdatedTimestamp = NULL;"));
+
+  // Populate display fields maps from the current display tables
+  QMap<QString, QMap<QString, QString> > displayFieldsMapPatient;
+  QMap<QString, QMap<QString, QString> > displayFieldsMapStudy;
+  QMap<QString, QMap<QString, QString> > displayFieldsMapSeries;
+  d->getDisplayFieldsCache(displayFieldsMapPatient, displayFieldsMapStudy, displayFieldsMapSeries);
+
   // Get display names for newly added files and add them into the display tables
   ctkDICOMDisplayRuleManager* ruleManager = new ctkDICOMDisplayRuleManager();
+  ruleManager->setDatabase(d->Database);
   while (newFilesQuery.next())
   {
-    QMap<QString, QString> displayFieldsMap;
-    ruleManager->displayFieldsForFile(newFilesQuery.value(0).toString(), displayFieldsMap);
+    QMap<QString, QString> displayFieldsForCurrentSeries = displayFieldsMapSeries[newFilesQuery.value(1).toString()];
+    QMap<QString, QString> displayFieldsForCurrentStudy = displayFieldsMapStudy[ displayFieldsForCurrentSeries["StudyInstanceUID"] ];
+    QMap<QString, QString> displayFieldsForCurrentPatient = displayFieldsMapPatient[ displayFieldsForCurrentStudy["PatientsUID"] ];
 
-    // Assemble insert statements
-    QString displayPatientsFieldList, displayPatientsValueList;
-    QString displayStudiesFieldList, displayStudiesValueList;
-    QString displaySeriesFieldList, displaySeriesValueList;
-    foreach (QString tableAndFieldString, displayFieldsMap)
-    {
-      QStringList tableFieldPair = tableAndFieldString.split(TableFieldSeparator);
-      if (!tableFieldPair[0].compare("DisplayPatients"))
-      {
-        displayPatientsFieldList = QString("'" + tableFieldPair[1] + "', ");
-        displayPatientsValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
-      }
-      else if (!tableFieldPair[0].compare("DisplayStudies"))
-      {
-        displayStudiesFieldList = QString("'" + tableFieldPair[1] + "', ");
-        displayStudiesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
-      }
-      else if (!tableFieldPair[0].compare("DisplaySeries"))
-      {
-        displaySeriesFieldList = QString("'" + tableFieldPair[1] + "', ");
-        displaySeriesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
-      }
-    }
-    // Trim the separators from the end
-    displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
-    displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
-    displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
-    displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
-    displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
-    displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
+    ruleManager->updateDisplayFieldsForInstance(newFilesQuery.value(0).toString(),
+      displayFieldsForCurrentPatient, displayFieldsForCurrentStudy, displayFieldsForCurrentSeries);
 
-    // Insert row into DisplayPatients if does not exist
-    QSqlQuery displayPatientsQuery(d->Database);
-    d->loggedExec( displayPatientsQuery,QString("SELECT UID FROM DisplayPatients WHERE UID = %1 ;")
-      .arg(QString("DisplayPatients%1UID").arg(TableFieldSeparator)) );
-    if (!displayPatientsQuery.next())
-    {
-      QSqlQuery insertDisplayPatientStatement(d->Database);
-      insertDisplayPatientStatement.prepare ( "INSERT INTO DisplayPatients (?) values (?)" );
-      insertDisplayPatientStatement.bindValue ( 0, displayPatientsFieldList );
-      insertDisplayPatientStatement.bindValue ( 1, displayPatientsValueList );
-      d->loggedExec(insertDisplayPatientStatement);
-    }
+    displayFieldsMapSeries[newFilesQuery.value(1).toString()] = displayFieldsForCurrentSeries;
+    displayFieldsMapStudy[ displayFieldsForCurrentSeries["StudyInstanceUID"] ] = displayFieldsForCurrentStudy;
+    displayFieldsMapPatient[ displayFieldsForCurrentStudy["PatientsUID"] ] = displayFieldsForCurrentPatient;
+  }
+  delete ruleManager;
 
-    // Insert row into DisplayStudies if does not exist
-    QSqlQuery displayStudiesQuery(d->Database);
-    d->loggedExec( displayStudiesQuery,QString("SELECT StudyInstanceUID FROM DisplayStudies WHERE StudyInstanceUID = %1 ;")
-      .arg(QString("DisplayStudies%1StudyInstanceUID").arg(TableFieldSeparator)) );
-    if (!displayStudiesQuery.next())
-    {
-      QSqlQuery insertDisplayStudiesStatement(d->Database);
-      insertDisplayStudiesStatement.prepare ( "INSERT INTO DisplayStudies (?) values (?)" );
-      insertDisplayStudiesStatement.bindValue ( 0, displayStudiesFieldList );
-      insertDisplayStudiesStatement.bindValue ( 1, displayStudiesValueList );
-      d->loggedExec(insertDisplayStudiesStatement);
-    }
+  // Assemble insert/update statements
+  //QString displayPatientsFieldList;
+  //QString displayStudiesFieldList;
+  //QString displaySeriesFieldList;
+  //foreach (QString tableAndFieldString, displayFieldsMap)
+  //{
+  //  QStringList tableFieldPair = tableAndFieldString.split(TableFieldSeparator);
+  //  if (!tableFieldPair[0].compare("DisplayPatients"))
+  //  {
+  //    displayPatientsFieldList = QString("'" + tableFieldPair[1] + "', ");
+  //    displayPatientsValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
+  //  }
+  //  else if (!tableFieldPair[0].compare("DisplayStudies"))
+  //  {
+  //    displayStudiesFieldList = QString("'" + tableFieldPair[1] + "', ");
+  //    displayStudiesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
+  //  }
+  //  else if (!tableFieldPair[0].compare("DisplaySeries"))
+  //  {
+  //    displaySeriesFieldList = QString("'" + tableFieldPair[1] + "', ");
+  //    displaySeriesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
+  //  }
+  //}
+  //// Trim the separators from the end
+  //displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
+  //displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
+  //displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
+  //displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
+  //displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
+  //displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
 
-    // Insert row into DisplaySeries if does not exist
-    QSqlQuery displaySeriesQuery(d->Database);
-    d->loggedExec( displaySeriesQuery,QString("SELECT SeriesInstanceUID FROM DisplaySeries WHERE SeriesInstanceUID = %1 ;")
-      .arg(QString("DisplaySeries%1SeriesInstanceUID").arg(TableFieldSeparator)) );
-    if (!displaySeriesQuery.next())
+  //// Update/insert the updated display values
+  //foreach (QMap<QString, QString> currentPatient in displayFieldsMapPatient)
+  //{
+  //  // Insert row into DisplayPatients if does not exist
+  //  QSqlQuery displayPatientsQuery(d->Database);
+  //  QSqlQuery updateDisplayPatientStatement(d->Database);
+  //  displayPatientsQuery.prepare( QString("SELECT UID FROM DisplayPatients WHERE UID = %1 ;").arg(currentPatient["UID"]) );
+  //  if (!displayPatientsQuery.next())
+  //  {
+  //    updateDisplayPatientStatement.prepare ( "INSERT INTO DisplayPatients (?) values (?)" );
+  //  }
+  //  else
+  //  {
+  //  }
+  //  updateDisplayPatientStatement.bindValue ( 0, displayPatientsFieldList );
+  //  updateDisplayPatientStatement.bindValue ( 1, displayPatientsValueList );
+  //  d->loggedExec(updateDisplayPatientStatement);
+  //}
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabasePrivate::getDisplayFieldsCache( QMap<QString, QMap<QString, QString> > &displayFieldsMapPatient,
+                                                QMap<QString, QMap<QString, QString> > &displayFieldsMapStudy,
+                                                QMap<QString, QMap<QString, QString> > &displayFieldsMapSeries )
+{
+  QSqlQuery seriesQuery(Database);
+  displayFieldsMapSeries.clear();
+  loggedExec(seriesQuery,QString("SELECT * FROM DisplaySeries;"));
+  while (seriesQuery.next())
+  {
+    QSqlRecord seriesRecord = seriesQuery.record();
+    QString seriesInstanceUID = seriesRecord.value("SeriesInstanceUID").toString();
+
+    QMap<QString, QString> seriesFieldsMap;
+    for (int fieldIndex=0; fieldIndex<seriesRecord.count(); ++fieldIndex)
     {
-      QSqlQuery insertDisplaySeriesStatement(d->Database);
-      insertDisplaySeriesStatement.prepare ( "INSERT INTO DisplaySeries (?) values (?)" );
-      insertDisplaySeriesStatement.bindValue ( 0, displaySeriesFieldList );
-      insertDisplaySeriesStatement.bindValue ( 1, displaySeriesValueList );
-      d->loggedExec(insertDisplaySeriesStatement);
+      seriesFieldsMap.insert(seriesRecord.fieldName(fieldIndex), seriesRecord.value(fieldIndex).toString());
     }
+    displayFieldsMapSeries.insert(seriesInstanceUID, seriesFieldsMap);
   }
 
-  delete ruleManager;
+  QSqlQuery studyQuery(Database);
+  displayFieldsMapStudy.clear();
+  loggedExec(studyQuery,QString("SELECT * FROM DisplayStudy;"));
+  while (studyQuery.next())
+  {
+    QSqlRecord studyRecord = studyQuery.record();
+    QString studyInstanceUID = studyRecord.value("StudyInstanceUID").toString();
+
+    QMap<QString, QString> studyFieldsMap;
+    for (int fieldIndex=0; fieldIndex<studyRecord.count(); ++fieldIndex)
+    {
+      studyFieldsMap.insert(studyRecord.fieldName(fieldIndex), studyRecord.value(fieldIndex).toString());
+    }
+    displayFieldsMapStudy.insert(studyInstanceUID, studyFieldsMap);
+  }
+
+  QSqlQuery patientQuery(Database);
+  displayFieldsMapPatient.clear();
+  loggedExec(patientQuery,QString("SELECT * FROM DisplayPatients;"));
+  while (patientQuery.next())
+  {
+    QSqlRecord patientRecord = patientQuery.record();
+    QString patientInstanceUID = patientRecord.value("UID").toString();
+
+    QMap<QString, QString> patientFieldsMap;
+    for (int fieldIndex=0; fieldIndex<patientRecord.count(); ++fieldIndex)
+    {
+      patientFieldsMap.insert(patientRecord.fieldName(fieldIndex), patientRecord.value(fieldIndex).toString());
+    }
+    displayFieldsMapPatient.insert(patientInstanceUID, patientFieldsMap);
+  }
 }

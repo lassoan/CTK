@@ -248,8 +248,6 @@ Q_SIGNALS:
 protected:
   QScopedPointer<ctkDICOMDatabasePrivate> d_ptr;
 
-
-
 private:
   Q_DECLARE_PRIVATE(ctkDICOMDatabase);
   Q_DISABLE_COPY(ctkDICOMDatabase);
