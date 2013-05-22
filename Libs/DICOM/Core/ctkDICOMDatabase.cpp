@@ -1627,10 +1627,10 @@ void ctkDICOMDatabase::getCachedTags(const QString sopInstanceUID, QMap<QString,
     {
     tag = selectValue.value(0).toString();
     value = selectValue.value(1).toString();
-    if (value == QString(""))
-      {
-      value = ValueIsEmptyString;
-      }
+    if (value == TagNotInInstance || value == ValueIsEmptyString)
+    {
+      value = QString("");
+    }
     cachedTags.insert(tag, value);
     }
 }
