@@ -40,6 +40,8 @@
 
 #include "ctkLogger.h"
 
+#include "ctkDICOMDisplayedFieldGenerator.h"
+
 // DCMTK includes
 #include <dcmtk/dcmdata/dcfilefo.h>
 #include <dcmtk/dcmdata/dcfilefo.h>
@@ -69,18 +71,6 @@ static QString ValueIsEmptyString("__VALUE_IS_EMPTY_STRING__");
 // Separator character for table and field names to be used in
 // display rules manager
 static QString TableFieldSeparator(":");
-
-//TODO For sake of compiling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-class ctkDICOMDisplayRuleManager : public QObject
-{
-public:
-  void updateDisplayFieldsForInstance( QString sopInstanceUid,
-    QMap<QString, QString> &displayFieldsMapPatient,
-    QMap<QString, QString> &displayFieldsMapStudy,
-    QMap<QString, QString> &displayFieldsMapSeries ) { };
-
-  void setDatabase(QSqlDatabase &database) { };
-};
 
 //------------------------------------------------------------------------------
 class ctkDICOMDatabasePrivate
@@ -140,6 +130,8 @@ public:
   QMap<QString, QString> LoadedHeader;
 
   ctkDICOMAbstractThumbnailGenerator* thumbnailGenerator;
+
+  ctkDICOMDisplayedFieldGenerator DisplayedFieldGenerator;
 
   /// these are for optimizing the import of image sequences
   /// since most information are identical for all slices
@@ -330,6 +322,8 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     {
     this->initializeTagCache();
     }
+  
+  setTagsToPrecache(d->DisplayedFieldGenerator.getRequiredTags());
 }
 
 
@@ -344,6 +338,7 @@ ctkDICOMDatabase::ctkDICOMDatabase(QString databaseFile)
   Q_D(ctkDICOMDatabase);
   d->registerCompressionLibraries();
   d->init(databaseFile);
+  d->DisplayedFieldGenerator.setDatabase(this);
 }
 
 ctkDICOMDatabase::ctkDICOMDatabase(QObject* parent)
@@ -1643,35 +1638,41 @@ void ctkDICOMDatabase::updateDisplayedFields()
   d->getDisplayFieldsCache(displayFieldsMapPatient, displayFieldsMapStudy, displayFieldsMapSeries);
 
   // Get display names for newly added files and add them into the display tables
-  ctkDICOMDisplayRuleManager* ruleManager = new ctkDICOMDisplayRuleManager();
-  ruleManager->setDatabase(d->Database);
   while (newFilesQuery.next())
   {
     QMap<QString, QString> displayFieldsForCurrentSeries = displayFieldsMapSeries[newFilesQuery.value(1).toString()];
     QMap<QString, QString> displayFieldsForCurrentStudy = displayFieldsMapStudy[ displayFieldsForCurrentSeries["StudyInstanceUID"] ];
     QMap<QString, QString> displayFieldsForCurrentPatient = displayFieldsMapPatient[ displayFieldsForCurrentStudy["PatientsUID"] ];
 
-    ruleManager->updateDisplayFieldsForInstance(newFilesQuery.value(0).toString(),
+    d->DisplayedFieldGenerator.updateDisplayFieldsForInstance(newFilesQuery.value(0).toString(),
       displayFieldsForCurrentPatient, displayFieldsForCurrentStudy, displayFieldsForCurrentSeries);
 
     displayFieldsMapSeries[newFilesQuery.value(1).toString()] = displayFieldsForCurrentSeries;
     displayFieldsMapStudy[ displayFieldsForCurrentSeries["StudyInstanceUID"] ] = displayFieldsForCurrentStudy;
     displayFieldsMapPatient[ displayFieldsForCurrentStudy["PatientsUID"] ] = displayFieldsForCurrentPatient;
   }
-  delete ruleManager;
 
-  // Assemble insert/update statements
-  //QString displayPatientsFieldList;
-  //QString displayStudiesFieldList;
-  //QString displaySeriesFieldList;
-  //foreach (QString tableAndFieldString, displayFieldsMap)
-  //{
-  //  QStringList tableFieldPair = tableAndFieldString.split(TableFieldSeparator);
-  //  if (!tableFieldPair[0].compare("DisplayPatients"))
-  //  {
-  //    displayPatientsFieldList = QString("'" + tableFieldPair[1] + "', ");
-  //    displayPatientsValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
-  //  }
+  // Assemble field lists
+  QString displayPatientsFieldList;
+  QString displayStudiesFieldList;
+  QString displaySeriesFieldList;
+  foreach (QString tagName, displayFieldsMapPatient.begin()->keys())
+  {
+    displayPatientsFieldList = QString("'" + tagName + "', ");
+  }
+  foreach (QString tagName, displayFieldsMapStudy.begin()->keys())
+  {
+    displayStudiesFieldList = QString("'" + tagName + "', ");
+  }
+  foreach (QString tagName, displayFieldsMapSeries.begin()->keys())
+  {
+    displaySeriesFieldList = QString("'" + tagName + "', ");
+  }
+  // Trim the separators from the end
+  displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
+  displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
+  displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
+
   //  else if (!tableFieldPair[0].compare("DisplayStudies"))
   //  {
   //    displayStudiesFieldList = QString("'" + tableFieldPair[1] + "', ");
@@ -1682,14 +1683,9 @@ void ctkDICOMDatabase::updateDisplayedFields()
   //    displaySeriesFieldList = QString("'" + tableFieldPair[1] + "', ");
   //    displaySeriesValueList = QString(displayFieldsMap[tableAndFieldString] + ", ");
   //  }
-  //}
-  //// Trim the separators from the end
-  //displayPatientsFieldList = displayPatientsFieldList.left(displayPatientsFieldList.size() - 3);
-  //displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
-  //displayStudiesFieldList = displayStudiesFieldList.left(displayStudiesFieldList.size() - 3);
-  //displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
-  //displaySeriesFieldList = displaySeriesFieldList.left(displaySeriesFieldList.size() - 3);
-  //displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
+  //  displayPatientsValueList = displayPatientsValueList.left(displayPatientsValueList.size() - 2);
+  //  displayStudiesValueList = displayStudiesValueList.left(displayStudiesValueList.size() - 2);
+  //  displaySeriesValueList = displaySeriesValueList.left(displaySeriesValueList.size() - 2);
 
   //// Update/insert the updated display values
   //foreach (QMap<QString, QString> currentPatient in displayFieldsMapPatient)
