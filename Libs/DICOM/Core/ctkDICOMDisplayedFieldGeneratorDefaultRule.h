@@ -91,6 +91,7 @@ public:
     //TODO: Number of studies
 
     displayFieldsForCurrentStudy["StudyInstanceUID"] = cachedTags[dicomTagToString(DCM_StudyInstanceUID)];
+    displayFieldsForCurrentStudy["PatientsUID"] = displayFieldsForCurrentPatient["UID"];
     displayFieldsForCurrentStudy["StudyDescription"] = cachedTags[dicomTagToString(DCM_StudyDescription)];
     displayFieldsForCurrentStudy["StudyDate"] = cachedTags[dicomTagToString(DCM_StudyDate)];
     displayFieldsForCurrentStudy["ModalitiesInStudy"] = cachedTags[dicomTagToString(DCM_ModalitiesInStudy)];
@@ -103,10 +104,6 @@ public:
     displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_SeriesDescription)];
     displayFieldsForCurrentSeries["Modality"] = cachedTags[dicomTagToString(DCM_Modality)];
     //TODO: Number of images
-
-    // Get internal patient UID
-    //TODO: get the patient UID from the tag cache
-    displayFieldsForCurrentStudy["PatientsUID"] = displayFieldsForCurrentPatient["UID"];
   }
 
   /// \brief TODO
