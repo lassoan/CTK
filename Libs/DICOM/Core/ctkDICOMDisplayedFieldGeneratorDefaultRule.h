@@ -91,7 +91,7 @@ public:
     //TODO: Number of studies
 
     displayFieldsForCurrentStudy["StudyInstanceUID"] = cachedTags[dicomTagToString(DCM_StudyInstanceUID)];
-    displayFieldsForCurrentStudy["PatientsUID"] = displayFieldsForCurrentPatient["UID"];
+    displayFieldsForCurrentStudy["PatientIndex"] = displayFieldsForCurrentPatient["PatientIndex"];
     displayFieldsForCurrentStudy["StudyDescription"] = cachedTags[dicomTagToString(DCM_StudyDescription)];
     displayFieldsForCurrentStudy["StudyDate"] = cachedTags[dicomTagToString(DCM_StudyDate)];
     displayFieldsForCurrentStudy["ModalitiesInStudy"] = cachedTags[dicomTagToString(DCM_ModalitiesInStudy)];

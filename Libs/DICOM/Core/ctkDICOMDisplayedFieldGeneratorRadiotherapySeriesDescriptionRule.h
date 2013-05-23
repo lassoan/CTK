@@ -74,7 +74,7 @@ public:
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)
   {
     QString modality = cachedTags[dicomTagToString(DCM_Modality)];
-    if (modality.compare("RTPLAN"))
+    if (!modality.compare("RTPLAN"))
     {
       if (!cachedTags[dicomTagToString(DCM_RTPlanName)].isEmpty())
       {
@@ -89,7 +89,7 @@ public:
         displayFieldsForCurrentSeries["SeriesDescription"] = QString(EMPTY_SERIES_DESCRIPTION_RTPLAN);
       }
     }
-    else if (modality.compare("RTSTRUCT"))
+    else if (!modality.compare("RTSTRUCT"))
     {
       if (!cachedTags[dicomTagToString(DCM_StructureSetName)].isEmpty())
       {
@@ -104,7 +104,7 @@ public:
         displayFieldsForCurrentSeries["SeriesDescription"] = QString(EMPTY_SERIES_DESCRIPTION_RTSTRUCT);
       }
     }
-    else if (modality.compare("RTIMAGE"))
+    else if (!modality.compare("RTIMAGE"))
     {
       if (!cachedTags[dicomTagToString(DCM_RTImageName)].isEmpty())
       {

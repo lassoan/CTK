@@ -219,6 +219,7 @@ public:
     /// \brief Nicely formatted (group,element) version of a tag
     ///
     static QString TagKey( const DcmTag& tag );
+    static QString TagKeyStripped( const DcmTag& tag );
 
     ///
     /// \brief Description (name) of the tag
