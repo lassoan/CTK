@@ -126,13 +126,13 @@ public:
   int getPatientIndexByStudyInstanceUID(QString studyInstanceUID, QVector<QMap<QString, QString> > displayFieldsVectorPatient);
 
   /// TODO
-  int getDisplayPatientFieldsIndex(QString patientName, QString patientID, QVector<QMap<QString, QString> > displayFieldsVectorPatient);
+  int getDisplayPatientFieldsIndex(QString patientName, QString patientID, QVector<QMap<QString, QString> > &displayFieldsVectorPatient);
 
   /// TODO
-  QString getDisplayStudyFieldsKey(QString studyInstanceUID, QMap<QString, QMap<QString, QString> > displayFieldsMapStudy);
+  QString getDisplayStudyFieldsKey(QString studyInstanceUID, QMap<QString, QMap<QString, QString> > &displayFieldsMapStudy);
 
   /// TODO
-  QString getDisplaySeriesFieldsKey(QString seriesInstanceUID, QMap<QString, QMap<QString, QString> > displayFieldsMapSeries);
+  QString getDisplaySeriesFieldsKey(QString seriesInstanceUID, QMap<QString, QMap<QString, QString> > &displayFieldsMapSeries);
 
   ///
   /// get all Filename values from table
@@ -1721,7 +1721,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
 }
 
 //------------------------------------------------------------------------------
-int ctkDICOMDatabasePrivate::getDisplayPatientFieldsIndex(QString patientName, QString patientID, QVector<QMap<QString, QString> > displayFieldsVectorPatient)
+int ctkDICOMDatabasePrivate::getDisplayPatientFieldsIndex(QString patientName, QString patientID, QVector<QMap<QString, QString> > &displayFieldsVectorPatient)
 {
   // Look for the patient in the display fields cache first
   for (int patientIndex=0; patientIndex < displayFieldsVectorPatient.size(); ++patientIndex)
@@ -1767,7 +1767,7 @@ int ctkDICOMDatabasePrivate::getDisplayPatientFieldsIndex(QString patientName, Q
 }
 
 //------------------------------------------------------------------------------
-QString ctkDICOMDatabasePrivate::getDisplayStudyFieldsKey(QString studyInstanceUID, QMap<QString, QMap<QString, QString> > displayFieldsMapStudy)
+QString ctkDICOMDatabasePrivate::getDisplayStudyFieldsKey(QString studyInstanceUID, QMap<QString, QMap<QString, QString> > &displayFieldsMapStudy)
 {
   // Look for the study in the display fields cache first
   foreach (QString currentStudyInstanceUid, displayFieldsMapStudy.keys())
@@ -1803,7 +1803,7 @@ QString ctkDICOMDatabasePrivate::getDisplayStudyFieldsKey(QString studyInstanceU
 }
 
 //------------------------------------------------------------------------------
-QString ctkDICOMDatabasePrivate::getDisplaySeriesFieldsKey(QString seriesInstanceUID, QMap<QString, QMap<QString, QString> > displayFieldsMapSeries)
+QString ctkDICOMDatabasePrivate::getDisplaySeriesFieldsKey(QString seriesInstanceUID, QMap<QString, QMap<QString, QString> > &displayFieldsMapSeries)
 {
   // Look for the series in the display fields cache first
   foreach (QString currentSeriesInstanceUid, displayFieldsMapSeries.keys())
@@ -1856,7 +1856,7 @@ void ctkDICOMDatabasePrivate::applyDisplayFieldsChanges( QMap<QString, QMap<QStr
       foreach (QString tagName, currentPatient.keys())
       {
         //TODO
-        if (tagName.compare("UID")) // UID is auto-increment, we cannot set that
+        if (tagName.compare("UID"))
         {
           displayPatientsFieldList.append( tagName + ", " );
           displayPatientsValueList.append( currentPatient[tagName].isEmpty() ? "NULL, " : "'" + currentPatient[tagName] + "', " );
