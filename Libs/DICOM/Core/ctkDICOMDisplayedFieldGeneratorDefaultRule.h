@@ -114,19 +114,21 @@ public:
     const QMap<QString, QString> &emptyFieldsSeries, const QMap<QString, QString> &emptyFieldsStudy, const QMap<QString, QString> &emptyFieldsPatient
     )
   {
-    mergeExpectSameValue("UID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
+    mergeExpectSameValue("PatientIndex", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
     mergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
     mergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
 
+    mergeExpectSameValue("StudyInstanceUID", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeExpectSameValue("PatientIndex", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
-    mergeExpectSameValue("PatientsUID", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
 
-    mergeExpectSameValue("SeriesNumber", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+    mergeExpectSameValue("SeriesInstanceUID", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
     mergeExpectSameValue("StudyInstanceUID", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+    mergeExpectSameValue("SeriesNumber", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
     mergeConcatenate("SeriesDescription", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
     mergeExpectSameValue("Modality", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
   }
