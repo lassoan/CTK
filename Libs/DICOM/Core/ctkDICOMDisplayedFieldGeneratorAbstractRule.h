@@ -36,17 +36,10 @@ class ctkDICOMDatabase;
 class CTK_DICOM_CORE_EXPORT ctkDICOMDisplayedFieldGeneratorAbstractRule
 {
 public:
-
-  enum EvaluationResult
-  {
-    RULE_ERROR,
-    RULE_NOT_APPLICABLE,
-    RULE_APPLIED_CONTINUE_PROCESSING,
-    RULE_APPLIED_STOP_PROCESSING
-  };
-
+  /// \brief TODO
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)=0;
 
+  /// \brief TODO
   virtual void mergeDisplayFieldsForInstance(
     const QMap<QString, QString> &initialFieldsSeries, const QMap<QString, QString> &initialFieldsStudy, const QMap<QString, QString> &initialFieldsPatient,
     const QMap<QString, QString> &newFieldsSeries, const QMap<QString, QString> &newFieldsStudy, const QMap<QString, QString> &newFieldsPatient,
@@ -54,15 +47,19 @@ public:
     const QMap<QString, QString> &emptyFieldsSeries, const QMap<QString, QString> &emptyFieldsStudy, const QMap<QString, QString> &emptyFieldsPatient
     )=0;
 
+  /// \brief TODO
   virtual QStringList getRequiredDICOMTags()=0;
 
+  /// \brief TODO
   static QString dicomTagToString(DcmTagKey& tag)
   {    
     return QString("%1,%2").arg(tag.getGroup(),4,16,QLatin1Char('0')).arg(tag.getElement(),4,16,QLatin1Char('0'));
   }  
 
+  /// \brief TODO
   virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldsDisplaySeries, QMap<QString, QString> emptyFieldsDisplayStudies, QMap<QString, QString> emptyFieldsDisplayPatients)=0;
 
+  /// \brief TODO
   static bool isFieldEmpty(const QString &fieldName, const QMap<QString, QString> &fields, const QMap<QString, QString> &emptyValuesForEachField)
   {
     if (!fields.contains(fieldName))
@@ -84,6 +81,7 @@ public:
     return false;
   }
 
+  /// \brief TODO
   static void mergeExpectSameValue(const QString &fieldName, const QMap<QString, QString> &initialFields, const QMap<QString, QString> &newFields, QMap<QString, QString> &mergedFields, const QMap<QString, QString> &emptyValuesForEachField )
   {
     if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))
@@ -109,6 +107,7 @@ public:
     mergedFields[fieldName]=initialFields[fieldName];
   }
 
+  /// \brief TODO
   static void mergeConcatenate(const QString &fieldName, const QMap<QString, QString> &initialFields, const QMap<QString, QString> &newFields, QMap<QString, QString> &mergedFields, const QMap<QString, QString> &emptyValuesForEachField)
   {
     if (isFieldEmpty(fieldName, newFields, emptyValuesForEachField))

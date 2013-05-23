@@ -36,13 +36,7 @@
 class CTK_DICOM_CORE_EXPORT ctkDICOMDisplayedFieldGeneratorRadiotherapySeriesDescriptionRule : public ctkDICOMDisplayedFieldGeneratorAbstractRule
 {
 public:
-  virtual EvaluationResult evaluate(QStringList dicomFields, QMap<QString, QString> displayedFields, const ctkDICOMDatabase &db)
-  {
-    // TODO: fill default patient, study, series tables
-    // Patient:PatientID, Patient:PatientName
-    return RULE_APPLIED_CONTINUE_PROCESSING;
-  }
-
+  /// \brief TODO
   virtual QStringList getRequiredDICOMTags()
   {
     QStringList requiredTags;
@@ -68,6 +62,7 @@ public:
     return requiredTags;
   }
 
+  /// \brief TODO
   virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldsDisplaySeries, QMap<QString, QString> emptyFieldsDisplayStudies, QMap<QString, QString> emptyFieldsDisplayPatients)
   {
     emptyFieldsDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION_RTPLAN);
@@ -75,6 +70,7 @@ public:
     emptyFieldsDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION_RTIMAGE);
   }
 
+  /// \brief TODO
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)
   {
     QString modality = cachedTags[dicomTagToString(DCM_Modality)];
@@ -125,6 +121,7 @@ public:
     }
   }
 
+  /// \brief TODO
   virtual void mergeDisplayFieldsForInstance(
     const QMap<QString, QString> &initialFieldsSeries, const QMap<QString, QString> &initialFieldsStudy, const QMap<QString, QString> &initialFieldsPatient,
     const QMap<QString, QString> &newFieldsSeries, const QMap<QString, QString> &newFieldsStudy, const QMap<QString, QString> &newFieldsPatient,

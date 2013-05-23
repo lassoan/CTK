@@ -78,10 +78,11 @@ CREATE INDEX IF NOT EXISTS 'SeriesStudyIndex' ON 'Series' ('StudyInstanceUID');
 CREATE INDEX IF NOT EXISTS 'StudiesPatientIndex' ON 'Studies' ('PatientsUID');
 
 CREATE TABLE 'DisplayPatients' (
-  'UID' INTEGER PRIMARY KEY AUTOINCREMENT,
+  'UID' INT NOT NULL,
   'PatientName' VARCHAR(255) NULL ,
   'PatientID' VARCHAR(255) NULL ,
-  'NumberOfStudies' INT NULL );
+  'NumberOfStudies' INT NULL ,
+  PRIMARY KEY ('UID') );
 CREATE TABLE 'DisplayStudies' (
   'StudyInstanceUID' VARCHAR(64) NOT NULL ,
   'PatientsUID' INT NOT NULL ,

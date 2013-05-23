@@ -33,14 +33,8 @@
 /// Default rule for generating displayed fields from DICOM fields
 class CTK_DICOM_CORE_EXPORT ctkDICOMDisplayedFieldGeneratorDefaultRule : public ctkDICOMDisplayedFieldGeneratorAbstractRule
 {
-public: 
-  virtual EvaluationResult evaluate(QStringList dicomFields, QMap<QString, QString> displayedFields, const ctkDICOMDatabase &db)
-  {
-    // TODO: fill default patient, study, series tables
-    // Patient:PatientID, Patient:PatientName
-    return RULE_APPLIED_CONTINUE_PROCESSING;
-  }
-
+public:
+  /// \brief TODO
   virtual QStringList getRequiredDICOMTags()
   {
     QStringList requiredTags;
@@ -83,30 +77,39 @@ public:
     return requiredTags;
   }
 
+  /// \brief TODO
   virtual void registerEmptyFieldNames(QMap<QString, QString> emptyFieldsDisplaySeries, QMap<QString, QString> emptyFieldsDisplayStudies, QMap<QString, QString> emptyFieldsDisplayPatients)
   {
     emptyFieldsDisplaySeries.insertMulti("SeriesDescription", EMPTY_SERIES_DESCRIPTION);
   }
 
+  /// \brief TODO
   virtual void getDisplayFieldsForInstance(QMap<QString, QString> cachedTags, QMap<QString, QString> &displayFieldsForCurrentSeries, QMap<QString, QString> &displayFieldsForCurrentStudy, QMap<QString, QString> &displayFieldsForCurrentPatient)
   {
-    displayFieldsForCurrentPatient["PatientName"]=cachedTags[dicomTagToString(DCM_PatientName)];    
-    displayFieldsForCurrentPatient.insert("PatientID",cachedTags[dicomTagToString(DCM_PatientID)]);
+    displayFieldsForCurrentPatient["PatientName"] = cachedTags[dicomTagToString(DCM_PatientName)];    
+    displayFieldsForCurrentPatient["PatientID"] = cachedTags[dicomTagToString(DCM_PatientID)];
+    //TODO: Number of studies
 
-    displayFieldsForCurrentStudy.insert("StudyInstanceUID",cachedTags[dicomTagToString(DCM_StudyInstanceUID)]);
-    displayFieldsForCurrentStudy.insert("StudyDescription",cachedTags[dicomTagToString(DCM_StudyDescription)]);
-    displayFieldsForCurrentStudy.insert("StudyDate",cachedTags[dicomTagToString(DCM_StudyDate)]);
-    displayFieldsForCurrentStudy.insert("ModalitiesInStudy",cachedTags[dicomTagToString(DCM_ModalitiesInStudy)]);
-    displayFieldsForCurrentStudy.insert("InstitutionName",cachedTags[dicomTagToString(DCM_InstitutionName)]);
-    displayFieldsForCurrentStudy.insert("ReferringPhysician",cachedTags[dicomTagToString(DCM_ReferringPhysicianName)]);
+    displayFieldsForCurrentStudy["StudyInstanceUID"] = cachedTags[dicomTagToString(DCM_StudyInstanceUID)];
+    displayFieldsForCurrentStudy["StudyDescription"] = cachedTags[dicomTagToString(DCM_StudyDescription)];
+    displayFieldsForCurrentStudy["StudyDate"] = cachedTags[dicomTagToString(DCM_StudyDate)];
+    displayFieldsForCurrentStudy["ModalitiesInStudy"] = cachedTags[dicomTagToString(DCM_ModalitiesInStudy)];
+    displayFieldsForCurrentStudy["InstitutionName"] = cachedTags[dicomTagToString(DCM_InstitutionName)];
+    displayFieldsForCurrentStudy["ReferringPhysician"] = cachedTags[dicomTagToString(DCM_ReferringPhysicianName)];
 
-    displayFieldsForCurrentSeries.insert("SeriesInstanceUID",cachedTags[dicomTagToString(DCM_SeriesInstanceUID)]);
-    displayFieldsForCurrentSeries.insert("StudyInstanceUID",cachedTags[dicomTagToString(DCM_StudyInstanceUID)]);
-    displayFieldsForCurrentSeries.insert("SeriesNumber",cachedTags[dicomTagToString(DCM_SeriesNumber)]);
-    displayFieldsForCurrentSeries.insert("SeriesDescription",cachedTags[dicomTagToString(DCM_SeriesDescription)]);
-    displayFieldsForCurrentSeries.insert("Modality",cachedTags[dicomTagToString(DCM_Modality)]);
+    displayFieldsForCurrentSeries["SeriesInstanceUID"] = cachedTags[dicomTagToString(DCM_SeriesInstanceUID)];
+    displayFieldsForCurrentSeries["StudyInstanceUID"] = cachedTags[dicomTagToString(DCM_StudyInstanceUID)];
+    displayFieldsForCurrentSeries["SeriesNumber"] = cachedTags[dicomTagToString(DCM_SeriesNumber)];
+    displayFieldsForCurrentSeries["SeriesDescription"] = cachedTags[dicomTagToString(DCM_SeriesDescription)];
+    displayFieldsForCurrentSeries["Modality"] = cachedTags[dicomTagToString(DCM_Modality)];
+    //TODO: Number of images
+
+    // Get internal patient UID
+    //TODO: get the patient UID from the tag cache
+    displayFieldsForCurrentStudy["PatientsUID"] = displayFieldsForCurrentPatient["UID"];
   }
 
+  /// \brief TODO
   virtual void mergeDisplayFieldsForInstance(
     const QMap<QString, QString> &initialFieldsSeries, const QMap<QString, QString> &initialFieldsStudy, const QMap<QString, QString> &initialFieldsPatient,
     const QMap<QString, QString> &newFieldsSeries, const QMap<QString, QString> &newFieldsStudy, const QMap<QString, QString> &newFieldsPatient,
@@ -114,16 +117,19 @@ public:
     const QMap<QString, QString> &emptyFieldsSeries, const QMap<QString, QString> &emptyFieldsStudy, const QMap<QString, QString> &emptyFieldsPatient
     )
   {
+    mergeExpectSameValue("UID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
     mergeExpectSameValue("PatientName", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
     mergeExpectSameValue("PatientID", initialFieldsPatient, newFieldsPatient, mergedFieldsPatient, emptyFieldsPatient);
 
     mergeConcatenate("StudyDescription", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
+    mergeExpectSameValue("PatientsUID", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeExpectSameValue("StudyDate", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeConcatenate("ModalitiesInStudy", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeExpectSameValue("InstitutionName", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
     mergeConcatenate("ReferringPhysician", initialFieldsStudy, newFieldsStudy, mergedFieldsStudy, emptyFieldsStudy);
 
     mergeExpectSameValue("SeriesNumber", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
+    mergeExpectSameValue("StudyInstanceUID", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
     mergeConcatenate("SeriesDescription", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
     mergeExpectSameValue("Modality", initialFieldsSeries, newFieldsSeries, mergedFieldsSeries, emptyFieldsSeries);
   }
