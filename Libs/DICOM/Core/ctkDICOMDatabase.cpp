@@ -1116,7 +1116,7 @@ void ctkDICOMDatabasePrivate::precacheTags( const QString sopInstanceUID )
     unsigned short group, element;
     q->tagToGroupElement(tag, group, element);
     DcmTagKey tagKey(group, element);
-    QString value = dataset.GetAllElementValuesAsString(tagKey);
+    QString value = dataset.GetAllElementValuesAsFormattedString(tagKey);
     q->cacheTag(sopInstanceUID, tag, value);
     }
 
