@@ -135,12 +135,10 @@ void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase& ctkDICOMDatabase,
   d->Canceled = false;
   int CurrentFileIndex = 0;
   int lastReportedPercent = 0;
-  bool wasAutoUpdateFromFileEnabled = ctkDICOMDatabase.setAutoUpdateFromFile(false);
-  bool wasBlockedSignals = ctkDICOMDatabase.blockSignals(true);
   foreach(QString filePath, listOfFiles)
   {
     int percent = ( 100 * CurrentFileIndex ) / listOfFiles.size();
-    //if (lastReportedPercent / 10 < percent / 10)
+    if (lastReportedPercent / 10 < percent / 10)
       {
       emit this->progress(percent);
       lastReportedPercent = percent;
@@ -153,9 +151,6 @@ void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase& ctkDICOMDatabase,
       break;
       }
   }
-  ctkDICOMDatabase.blockSignals(wasBlockedSignals);
-  ctkDICOMDatabase.setAutoUpdateFromFile(wasAutoUpdateFromFileEnabled);
-  ctkDICOMDatabase.modified();
   float elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
   qDebug()
       << QString("DICOM indexer has successfully processed %1 files [%2s]")

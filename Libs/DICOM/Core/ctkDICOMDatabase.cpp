@@ -130,9 +130,6 @@ public:
   QString LastSeriesInstanceUID;
   int LastPatientUID;
 
-  bool AutoUpdateFromFile;
-  QFileSystemWatcher* DatabaseFileWatcher;
-
   /// resets the variables to new inserts won't be fooled by leftover values
   void resetLastInsertedValues();
 
@@ -161,9 +158,6 @@ ctkDICOMDatabasePrivate::ctkDICOMDatabasePrivate(ctkDICOMDatabase& o): q_ptr(&o)
   this->thumbnailGenerator = NULL;
   this->LoggedExecVerbose = false;
   this->TagCacheVerified = false;
-  this->AutoUpdateFromFile = true;
-  //this->DatabaseFileWatcher = new QFileSystemWatcher(&o);
-  //QObject::connect(this->DatabaseFileWatcher, SIGNAL(fileChanged(QString)), &o, SIGNAL(databaseChanged()));
   this->resetLastInsertedValues();
 }
 
@@ -293,6 +287,7 @@ void ctkDICOMDatabasePrivate::removeBackupFileList()
 }
 
 
+
 //------------------------------------------------------------------------------
 void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& connectionName )
 {
@@ -315,10 +310,10 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     }
   d->resetLastInsertedValues();
 
-  //d->DatabaseFileWatcher->removePaths(d->DatabaseFileWatcher->files());
-  if (!this->isInMemory() && d->AutoUpdateFromFile)
+  if (!isInMemory())
     {
-    //d->DatabaseFileWatcher->addPath(d->DatabaseFileName);
+      QFileSystemWatcher* watcher = new QFileSystemWatcher(QStringList(databaseFile),this);
+      connect(watcher, SIGNAL(fileChanged(QString)),this, SIGNAL (databaseChanged()) );
     }
 
   //Disable synchronous writing to make modifications faster
@@ -556,7 +551,6 @@ bool ctkDICOMDatabase::updateSchema(const char* schemaFile)
 void ctkDICOMDatabase::closeDatabase()
 {
   Q_D(ctkDICOMDatabase);
-  //d->DatabaseFileWatcher->removePaths(d->DatabaseFileWatcher->files());
   d->Database.close();
   d->TagCacheDatabase.close();
 }
@@ -1858,37 +1852,4 @@ bool ctkDICOMDatabase::cacheTags(const QStringList sopInstanceUIDs, const QStrin
   insertTags.addBindValue(tags);
   insertTags.addBindValue(values);
   return d->loggedExecBatch(insertTags);
-}
-
-//------------------------------------------------------------------------------
-bool ctkDICOMDatabase::autoUpdateFromFile() const
-{
-  Q_D(const ctkDICOMDatabase);
-  return d->AutoUpdateFromFile;
-}
-
-//------------------------------------------------------------------------------
-bool ctkDICOMDatabase::setAutoUpdateFromFile(bool b)
-{
-  Q_D(ctkDICOMDatabase);
-  if (d->AutoUpdateFromFile == b)
-    {
-    return d->AutoUpdateFromFile;
-    }
-  bool oldAutoUpdateFromFile = d->AutoUpdateFromFile;
-  d->AutoUpdateFromFile = b;
-
-  //d->DatabaseFileWatcher->removePaths(d->DatabaseFileWatcher->files());
-  if (!this->isInMemory() && d->AutoUpdateFromFile)
-    {
-    //d->DatabaseFileWatcher->addPath(d->DatabaseFileName);
-    }
-
-  return oldAutoUpdateFromFile;
-}
-
-//------------------------------------------------------------------------------
-void ctkDICOMDatabase::modified()
-{
-  emit databaseChanged();;
 }
