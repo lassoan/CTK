@@ -130,6 +130,9 @@ public:
   QString LastSeriesInstanceUID;
   int LastPatientUID;
 
+  bool AutoUpdateFromFile;
+  QFileSystemWatcher* DatabaseFileWatcher;
+
   /// resets the variables to new inserts won't be fooled by leftover values
   void resetLastInsertedValues();
 
@@ -158,6 +161,9 @@ ctkDICOMDatabasePrivate::ctkDICOMDatabasePrivate(ctkDICOMDatabase& o): q_ptr(&o)
   this->thumbnailGenerator = NULL;
   this->LoggedExecVerbose = false;
   this->TagCacheVerified = false;
+  this->AutoUpdateFromFile = true;
+  //this->DatabaseFileWatcher = new QFileSystemWatcher(&o);
+  //QObject::connect(this->DatabaseFileWatcher, SIGNAL(fileChanged(QString)), &o, SIGNAL(databaseChanged()));
   this->resetLastInsertedValues();
 }
 
@@ -287,7 +293,6 @@ void ctkDICOMDatabasePrivate::removeBackupFileList()
 }
 
 
-
 //------------------------------------------------------------------------------
 void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& connectionName )
 {
@@ -310,10 +315,10 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     }
   d->resetLastInsertedValues();
 
-  if (!isInMemory())
+  //d->DatabaseFileWatcher->removePaths(d->DatabaseFileWatcher->files());
+  if (!this->isInMemory() && d->AutoUpdateFromFile)
     {
-      QFileSystemWatcher* watcher = new QFileSystemWatcher(QStringList(databaseFile),this);
-      connect(watcher, SIGNAL(fileChanged(QString)),this, SIGNAL (databaseChanged()) );
+    //d->DatabaseFileWatcher->addPath(d->DatabaseFileName);
     }
 
   //Disable synchronous writing to make modifications faster
@@ -551,6 +556,7 @@ bool ctkDICOMDatabase::updateSchema(const char* schemaFile)
 void ctkDICOMDatabase::closeDatabase()
 {
   Q_D(ctkDICOMDatabase);
+  //d->DatabaseFileWatcher->removePaths(d->DatabaseFileWatcher->files());
   d->Database.close();
   d->TagCacheDatabase.close();
 }
@@ -1061,11 +1067,11 @@ void ctkDICOMDatabase::insert ( const QString& filePath, bool storeFile, bool ge
   /// first we check if the file is already in the database
   if (fileExistsAndUpToDate(filePath))
     {
-      logger.debug( "File " + filePath + " already added.");
+      //logger.debug( "File " + filePath + " already added.");
       return;
     }
 
-  logger.debug( "Processing " + filePath );
+  //logger.debug( "Processing " + filePath );
 
   ctkDICOMItem ctkDataset;
 
@@ -1101,7 +1107,7 @@ int ctkDICOMDatabasePrivate::insertPatient(const ctkDICOMItem& ctkDataset)
     {
       // we found him
       dbPatientID = checkPatientExistsQuery.value(checkPatientExistsQuery.record().indexOf("UID")).toInt();
-      qDebug() << "Found patient in the database as UId: " << dbPatientID;
+      //qDebug() << "Found patient in the database as UId: " << dbPatientID;
     }
   else
     {
@@ -1125,8 +1131,8 @@ int ctkDICOMDatabasePrivate::insertPatient(const ctkDICOMItem& ctkDataset)
       insertPatientStatement.bindValue ( 6, patientComments );
       loggedExec(insertPatientStatement);
       dbPatientID = insertPatientStatement.lastInsertId().toInt();
-      logger.debug ( "New patient inserted: " + QString().setNum ( dbPatientID ) );
-      qDebug() << "New patient inserted as : " << dbPatientID;
+      //logger.debug ( "New patient inserted: " + QString().setNum ( dbPatientID ) );
+      //qDebug() << "New patient inserted as : " << dbPatientID;
     }
     return dbPatientID;
 }
@@ -1141,7 +1147,7 @@ void ctkDICOMDatabasePrivate::insertStudy(const ctkDICOMItem& ctkDataset, int db
   checkStudyExistsQuery.exec();
   if(!checkStudyExistsQuery.next())
     {
-      qDebug() << "Need to insert new study: " << studyInstanceUID;
+      //qDebug() << "Need to insert new study: " << studyInstanceUID;
 
       QString studyID(ctkDataset.GetElementAsString(DCM_StudyID) );
       QString studyDate(ctkDataset.GetElementAsString(DCM_StudyDate) );
@@ -1177,7 +1183,7 @@ void ctkDICOMDatabasePrivate::insertStudy(const ctkDICOMItem& ctkDataset, int db
     }
   else
     {
-    qDebug() << "Used existing study: " << studyInstanceUID;
+    //qDebug() << "Used existing study: " << studyInstanceUID;
     }
 }
 
@@ -1188,11 +1194,11 @@ void ctkDICOMDatabasePrivate::insertSeries(const ctkDICOMItem& ctkDataset, QStri
   QSqlQuery checkSeriesExistsQuery (Database);
   checkSeriesExistsQuery.prepare ( "SELECT * FROM Series WHERE SeriesInstanceUID = ?" );
   checkSeriesExistsQuery.bindValue ( 0, seriesInstanceUID );
-  logger.warn ( "Statement: " + checkSeriesExistsQuery.lastQuery() );
+  //logger.warn ( "Statement: " + checkSeriesExistsQuery.lastQuery() );
   checkSeriesExistsQuery.exec();
   if(!checkSeriesExistsQuery.next())
     {
-      qDebug() << "Need to insert new series: " << seriesInstanceUID;
+      //qDebug() << "Need to insert new series: " << seriesInstanceUID;
 
       QString seriesDate(ctkDataset.GetElementAsString(DCM_SeriesDate) );
       QString seriesTime(ctkDataset.GetElementAsString(DCM_SeriesTime) );
@@ -1237,7 +1243,7 @@ void ctkDICOMDatabasePrivate::insertSeries(const ctkDICOMItem& ctkDataset, QStri
     }
   else
     {
-    qDebug() << "Used existing series: " << seriesInstanceUID;
+    //qDebug() << "Used existing series: " << seriesInstanceUID;
     }
 }
 
@@ -1342,10 +1348,10 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
       return;
     }
   bool found = fileExistsQuery.next();
-  qDebug() << "inserting filePath: " << filePath;
+  //qDebug() << "inserting filePath: " << filePath;
   if (!found)
     {
-      qDebug() << "database filename for " << sopInstanceUID << " is empty - we should insert on top of it";
+      //qDebug() << "database filename for " << sopInstanceUID << " is empty - we should insert on top of it";
     }
   else
     {
@@ -1355,7 +1361,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
 
       if ( databaseFilename == filePath && fileLastModified < databaseInsertTimestamp )
         {
-          logger.debug ( "File " + databaseFilename + " already added" );
+          //logger.debug ( "File " + databaseFilename + " already added" );
           return;
         }
       else
@@ -1381,7 +1387,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
   if ( patientID.isEmpty() && !studyInstanceUID.isEmpty() )
   { // Use study instance uid as patient id if patient id is empty - can happen on anonymized datasets
     // see: http://www.na-mic.org/Bug/view.php?id=2040
-    logger.warn("Patient ID is empty, using studyInstanceUID as patient ID");
+    //logger.warn("Patient ID is empty, using studyInstanceUID as patient ID");
     patientID = studyInstanceUID;
   }
   if ( patientsName.isEmpty() && !patientID.isEmpty() )
@@ -1415,7 +1421,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
 
       if(filePath.isEmpty())
         {
-          logger.debug ( "Saving file: " + filename );
+          //logger.debug ( "Saving file: " + filename );
 
           if ( !ctkDataset.SaveToFile( filename) )
             {
@@ -1429,8 +1435,8 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
 
           QFile currentFile( filePath );
           currentFile.copy(filename);
-          logger.debug( "Copy file from: " + filePath );
-          logger.debug( "Copy file to  : " + filename );
+          //logger.debug( "Copy file from: " + filePath );
+          //logger.debug( "Copy file to  : " + filename );
         }
     }
 
@@ -1448,7 +1454,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
            || LastPatientsBirthDate != patientsBirthDate
            || LastPatientsName != patientsName )
         {
-          qDebug() << "This looks like a different patient from last insert: " << patientID;
+          //qDebug() << "This looks like a different patient from last insert: " << patientID;
           // Ok, something is different from last insert, let's insert him if he's not
           // already in the db.
 
@@ -1464,7 +1470,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
           LastPatientsName = patientsName;
         }
 
-      qDebug() << "Going to insert this instance with dbPatientID: " << dbPatientID;
+      //qDebug() << "Going to insert this instance with dbPatientID: " << dbPatientID;
 
       // Patient is in now. Let's continue with the study
 
@@ -1474,7 +1480,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
 
           // let users of this class track when things happen
           emit q->studyAdded(studyInstanceUID);
-          qDebug() << "Study Added";
+          //qDebug() << "Study Added";
         }
 
 
@@ -1484,7 +1490,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
 
           // let users of this class track when things happen
           emit q->seriesAdded(seriesInstanceUID);
-          qDebug() << "Series Added";
+          //qDebug() << "Series Added";
         }
       // TODO: what to do with imported files
       //
@@ -1494,7 +1500,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
           checkImageExistsQuery.prepare ( "SELECT * FROM Images WHERE Filename = ?" );
           checkImageExistsQuery.bindValue ( 0, filename );
           checkImageExistsQuery.exec();
-          qDebug() << "Maybe add Instance";
+          //qDebug() << "Maybe add Instance";
           if(!checkImageExistsQuery.next())
             {
               QSqlQuery insertImageStatement ( Database );
@@ -1510,7 +1516,7 @@ void ctkDICOMDatabasePrivate::insert( const ctkDICOMItem& ctkDataset, const QStr
 
               // let users of this class track when things happen
               emit q->instanceAdded(sopInstanceUID);
-              qDebug() << "Instance Added";
+              //qDebug() << "Instance Added";
             }
         }
 
@@ -1607,7 +1613,7 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
   QSqlQuery fileRemove ( d->Database );
   fileRemove.prepare("DELETE FROM Images WHERE SeriesInstanceUID == :seriesID");
   fileRemove.bindValue(":seriesID",seriesInstanceUID);
-  logger.debug("SQLITE: removing seriesInstanceUID " + seriesInstanceUID);
+  //logger.debug("SQLITE: removing seriesInstanceUID " + seriesInstanceUID);
   success = fileRemove.exec();
   if (!success)
     {
@@ -1631,20 +1637,20 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
             }
           if (QFile( dbFilePath ).remove())
             {
-              logger.debug("Removed file " + dbFilePath );
+              //logger.debug("Removed file " + dbFilePath );
             }
           else
             {
-              logger.warn("Failed to remove file " + dbFilePath );
+              //logger.warn("Failed to remove file " + dbFilePath );
             }
         }
       if (QFile( thumbnailToRemove ).remove())
         {
-          logger.debug("Removed thumbnail " + thumbnailToRemove);
+          //logger.debug("Removed thumbnail " + thumbnailToRemove);
         }
       else
         {
-          logger.warn("Failed to remove thumbnail " + thumbnailToRemove);
+          //logger.warn("Failed to remove thumbnail " + thumbnailToRemove);
         }
     }
 
@@ -1852,4 +1858,37 @@ bool ctkDICOMDatabase::cacheTags(const QStringList sopInstanceUIDs, const QStrin
   insertTags.addBindValue(tags);
   insertTags.addBindValue(values);
   return d->loggedExecBatch(insertTags);
+}
+
+//------------------------------------------------------------------------------
+bool ctkDICOMDatabase::autoUpdateFromFile() const
+{
+  Q_D(const ctkDICOMDatabase);
+  return d->AutoUpdateFromFile;
+}
+
+//------------------------------------------------------------------------------
+bool ctkDICOMDatabase::setAutoUpdateFromFile(bool b)
+{
+  Q_D(ctkDICOMDatabase);
+  if (d->AutoUpdateFromFile == b)
+    {
+    return d->AutoUpdateFromFile;
+    }
+  bool oldAutoUpdateFromFile = d->AutoUpdateFromFile;
+  d->AutoUpdateFromFile = b;
+
+  //d->DatabaseFileWatcher->removePaths(d->DatabaseFileWatcher->files());
+  if (!this->isInMemory() && d->AutoUpdateFromFile)
+    {
+    //d->DatabaseFileWatcher->addPath(d->DatabaseFileName);
+    }
+
+  return oldAutoUpdateFromFile;
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabase::modified()
+{
+  emit databaseChanged();;
 }

@@ -423,7 +423,7 @@ ctkDICOMTableManager* ctkDICOMBrowser::dicomTableManager()
 //----------------------------------------------------------------------------
 void ctkDICOMBrowser::onFileIndexed(const QString& filePath)
 {
-  qDebug() << "Indexing \n\n\n\n" << filePath <<"\n\n\n";
+  //qDebug() << "Indexing \n\n\n\n" << filePath <<"\n\n\n";
 }
 
 //----------------------------------------------------------------------------
@@ -769,7 +769,7 @@ void ctkDICOMBrowser::onPatientsRightClicked(const QPoint &point)
   if (selectedAction == deleteAction
       && this->confirmDeleteSelectedUIDs(selectedPatientsUIDs))
     {
-    qDebug() << "Deleting " << numPatients << " patients";
+    //qDebug() << "Deleting " << numPatients << " patients";
     foreach (const QString& uid, selectedPatientsUIDs)
       {
       d->DICOMDatabase->removePatient(uid);
@@ -803,7 +803,7 @@ void ctkDICOMBrowser::onStudiesRightClicked(const QPoint &point)
   int numStudies = selectedStudiesUIDs.size();
   if (numStudies == 0)
     {
-    qDebug() << "No studies selected!";
+    //qDebug() << "No studies selected!";
     return;
     }
 
@@ -863,7 +863,7 @@ void ctkDICOMBrowser::onSeriesRightClicked(const QPoint &point)
   int numSeries = selectedSeriesUIDs.size();
   if (numSeries == 0)
     {
-    qDebug() << "No series selected!";
+    //qDebug() << "No series selected!";
     return;
     }
 

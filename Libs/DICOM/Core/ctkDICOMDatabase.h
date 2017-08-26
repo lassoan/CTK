@@ -167,8 +167,8 @@ public:
   /// be able to use the cache rather than re-reading the file.
   /// @param tags should be a list of ascii hex group/element tags
   ///  like "0008,0008" as in the instanceValue and fileValue calls
-  void setTagsToPrecache(const QStringList tags);
-  const QStringList tagsToPrecache();
+  Q_INVOKABLE void setTagsToPrecache(const QStringList tags);
+  Q_INVOKABLE const QStringList tagsToPrecache();
 
   /// Insert into the database if not already exsting.
   /// @param dataset The dataset to store into the database. Usually, this is
@@ -241,6 +241,15 @@ public:
   /// Insert lists of tags into the cache as a batch query operation
   Q_INVOKABLE bool cacheTags (const QStringList sopInstanceUIDs, const QStringList tags, const QStringList values);
 
+  /// Returns true if databaseChanged() signal is emitted on database file change.
+  Q_INVOKABLE bool autoUpdateFromFile() const;
+  /// Enables emitting of databaseChanged() signal when database file is changed.
+  /// File system watching may have a significant overhead, therefore it is advisable to disable auto-update
+  /// during batch updates.
+  /// Enabled by default.
+  Q_INVOKABLE bool setAutoUpdateFromFile(bool b);
+  
+  Q_INVOKABLE void modified();
 
 Q_SIGNALS:
   /// Things inserted to database.
