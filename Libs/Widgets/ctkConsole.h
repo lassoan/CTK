@@ -123,10 +123,10 @@ public:
   void setShellFont(const QFont& font);
 
   /// Return the completer of this console
-  ctkConsoleCompleter* completer() const;
+  Q_INVOKABLE ctkConsoleCompleter* completer() const;
 
   /// Set a completer for this console
-  void setCompleter(ctkConsoleCompleter* completer);
+  Q_INVOKABLE void setCompleter(ctkConsoleCompleter* completer);
 
   QColor promptColor()const;
 
@@ -214,6 +214,10 @@ public:
   /// show the completion options.
   /// \sa completerShortcuts(), setCompleterShortcuts()
   void addCompleterShortcut(const QKeySequence& key);
+
+  /// Auto-complete and input string. Useful when external software requires this.
+  /// \sa completerShortcuts(), setCompleterShortcuts()
+  virtual void autoComplete(const QString& input, int inputCursorPos, QStringList& results, int& replacementCursorStart, int& replacementCursorEnd);
 
   RunFileOptions runFileOptions()const;
 

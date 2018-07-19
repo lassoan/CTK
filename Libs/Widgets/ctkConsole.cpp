@@ -1413,3 +1413,76 @@ QString ctkConsole::readInputLine()
   return d->commandBuffer();
 }
 
+//-----------------------------------------------------------------------------
+void ctkConsole::autoComplete(const QString& input, int inputCursorPos, QStringList& results, int& replacementCursorStart, int& replacementCursorEnd)
+{
+  Q_D(ctkConsole);
+  if (!d->Completer)
+    {
+    return;
+    }
+  // Get the text between the current cursor position
+  // and the start of the line
+  int endOfLinePos = input.indexOf("\n", inputCursorPos);
+  QString commandText;
+  if (endOfLinePos < 0)
+    {
+    endOfLinePos = input.length() - 1;
+    }
+  commandText = input.mid(inputCursorPos, endOfLinePos-inputCursorPos);
+
+  /*
+  // search through the text the multiline statement symbol "... " + 1 char (go to the line char)
+  QString commandText = text_cursor.selectedText();
+  int pos_Ps2 = commandText.indexOf(q_ptr->ps2()) - 1;
+  while (pos_Ps2 > -1)
+  {
+    // remove the multiline symbol + the previous character due to "enter"
+    int number_deleted_char = q_ptr->ps2().size() + 1;
+    // remove the line continuation character '\' if it's here
+    if (commandText.at(pos_Ps2 - 1) == QChar('\\'))
+    {
+      pos_Ps2--;
+      number_deleted_char++;
+    }
+    commandText.remove(pos_Ps2, number_deleted_char);
+    pos_Ps2 = commandText.indexOf(q_ptr->ps2()) - 1;
+  }
+  commandText.remove(q_ptr->ps1());
+  commandText.remove('\r'); // not recongnize by python
+                            //commandText.replace(QRegExp("\\s*$"), ""); // Remove trailing spaces ---- DOESN'T WORK ----
+                            */
+
+                            // Save current positions: Since some implementation of
+                            // updateCompletionModel (e.g python) can display messages
+                            // while building the completion model, it is important to save
+                            // and restore the positions.
+  
+  // Call the completer to update the completion model
+  d->Completer->updateCompletionModel(commandText);
+
+  // Place and show the completer if there are available completions
+  int completionCount = d->Completer->completionCount();
+  if (completionCount > 0)
+    {
+    
+    for (int completionIndex = 0; d->Completer->setCurrentRow(completionIndex); ++completionIndex)
+      {
+      results << d->Completer->currentCompletion();
+      }
+/*
+    QAbstractItemModel* completerModel = d->Completer->model();
+    for (int completionIndex = 0; completionIndex < completionCount; ++completionIndex)
+      {
+      results << completerModel->data(completerModel->index(completionIndex,0)).toString();
+      }
+      */
+    replacementCursorStart = inputCursorPos;
+    replacementCursorEnd = endOfLinePos;
+    }
+  else
+    {
+    replacementCursorStart = replacementCursorEnd = inputCursorPos;
+    }
+
+}
