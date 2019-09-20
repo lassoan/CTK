@@ -97,7 +97,7 @@
   <customwidget>
    <class>ctkSearchBox</class>
    <extends>QLineEdit</extends>
-   <header location="global">ctkSearchBox.h</header>
+   <header>ctkSearchBox.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

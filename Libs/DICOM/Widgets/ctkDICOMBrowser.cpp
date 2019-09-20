@@ -27,6 +27,7 @@
 #include <QDebug>
 #include <QDialogButtonBox>
 #include <QFile>
+#include <QFileInfo>
 #include <QFileSystemModel>
 #include <QFormLayout>
 #include <QListView>
@@ -59,6 +60,11 @@
 //logger
 #include <ctkLogger.h>
 static ctkLogger logger("org.commontk.DICOM.Widgets.ctkDICOMBrowser");
+
+/*
+CTK_GET_CPP(ctkDICOMBrowser, QString, defaultDatabaseDirectoryName, DefaultDatabaseDirectoryName);
+CTK_SET_CPP(ctkDICOMBrowser, const QString&, setDefaultDatabaseDirectoryName, DefaultDatabaseDirectoryName);
+*/
 
 //----------------------------------------------------------------------------
 class ctkDICOMBrowserPrivate: public Ui_ctkDICOMBrowser
@@ -109,6 +115,7 @@ public:
 
   // Default database path to use if there is nothing in settings
   QString DefaultDatabasePath;
+  //QString DefaultDatabaseDirectoryName;
 };
 
 //----------------------------------------------------------------------------
@@ -275,6 +282,10 @@ void ctkDICOMBrowserPrivate::init()
 
   q->connect(this->DirectoryButton, SIGNAL(directoryChanged(QString)), q, SLOT(setDatabaseDirectory(QString)));
 
+  q->connect(this->SelectDatabaseDirectoryButton, SIGNAL(clicked()), q, SLOT(onSelectDatabaseDirectory()));
+  q->connect(this->CreateNewDatabaseButton, SIGNAL(clicked()), q, SLOT(onCreateNewDatabaseDirectory()));
+  q->connect(this->UpdateDatabaseButton, SIGNAL(clicked()), q, SLOT(onUpdateDatabase()));
+
   // Signal for displayed fields update
   q->connect(this->DICOMDatabase.data(), SIGNAL(displayedFieldsUpdateStarted()), q, SLOT(showUpdateDisplayedFieldsDialog()));
   q->connect(this->DICOMIndexer.data(), SIGNAL(displayedFieldsUpdateStarted()), q, SLOT(showUpdateDisplayedFieldsDialog()));
@@ -293,9 +304,13 @@ void ctkDICOMBrowserPrivate::init()
     settings.setValue(this->DatabaseDirectorySettingsKey, this->DefaultDatabasePath);
     settings.sync();
   }
+  
+  /* TODO:
   QString databaseDirectory = q->databaseDirectory();
   q->setDatabaseDirectory(databaseDirectory);
-  databaseDirectory = q->databaseDirectory(); // In case a new database has been created instead of updating schema in place
+  */
+
+  QString databaseDirectory = q->databaseDirectory(); // In case a new database has been created instead of updating schema in place
   bool wasBlocked = this->DirectoryButton->blockSignals(true);
   this->DirectoryButton->setDirectory(databaseDirectory);
   this->DirectoryButton->blockSignals(wasBlocked);
@@ -410,22 +425,6 @@ void ctkDICOMBrowser::setConfirmRemove(bool onOff)
 }
 
 //----------------------------------------------------------------------------
-bool ctkDICOMBrowser::schemaUpdateAutoCreateDirectory()
-{
-  Q_D(ctkDICOMBrowser);
-
-  return d->ShemaUpdateAutoCreateDirectory;
-}
-
-//----------------------------------------------------------------------------
-void ctkDICOMBrowser::setShemaUpdateAutoCreateDirectory(bool onOff)
-{
-  Q_D(ctkDICOMBrowser);
-
-  d->ShemaUpdateAutoCreateDirectory = onOff;
-}
-
-//----------------------------------------------------------------------------
 int ctkDICOMBrowser::patientsAddedDuringImport()
 {
   Q_D(ctkDICOMBrowser);
@@ -458,113 +457,109 @@ int ctkDICOMBrowser::instancesAddedDuringImport()
 }
 
 //----------------------------------------------------------------------------
-QString ctkDICOMBrowser::updateDatabaseSchemaIfNeeded()
+void ctkDICOMBrowser::onCreateNewDatabaseDirectory()
 {
   Q_D(ctkDICOMBrowser);
 
-  if (d->DICOMDatabase->schemaVersionLoaded() == d->DICOMDatabase->schemaVersion())
+  // Use the current database folder as a basis for the new name
+  QString baseFolder = this->databaseDirectory();
+  if (baseFolder.isEmpty())
   {
-    // Return if no update is needed (empty string means no new database has been set)
-    return QString();
-  }
-  
-  ctkDICOMBrowser::SchemaUpdateOption updateOption = this->schemaUpdateOption();
-  bool updateSchema = (updateOption == ctkDICOMBrowser::AlwaysUpdate);
-  if (updateOption == ctkDICOMBrowser::AskUser)
-  {
-    QString messageText = QString("DICOM database at location (%1) is incompatible with this version of the software.\n"
-      "Updating the database may take several minutes.\n\nAlternatively you may create a new, empty database (the old one will not be modified).")
-      .arg(this->databaseDirectory());
-    ctkMessageBox schemaUpdateMsgBox;
-    schemaUpdateMsgBox.setWindowTitle(tr("DICOM database update"));
-    schemaUpdateMsgBox.setText(messageText);
-    QPushButton* updateButton = schemaUpdateMsgBox.addButton(tr(" Update database "), QMessageBox::AcceptRole);
-    QPushButton* createButton = schemaUpdateMsgBox.addButton(tr(" Choose different folder "), QMessageBox::RejectRole);
-    schemaUpdateMsgBox.setDefaultButton(updateButton);
-    schemaUpdateMsgBox.exec();
-    if (schemaUpdateMsgBox.clickedButton() == updateButton)
-    {
-      updateSchema = true;
-    }
-  }
-
-  QString dir;
-  if (d->ShemaUpdateAutoCreateDirectory)
-  {
-    // Auto-generate new database folder name
-    QString newDatabaseDirPath = this->databaseDirectory();
-    newDatabaseDirPath.append("-");
-    newDatabaseDirPath.append(d->DICOMDatabase->schemaVersion());
-    dir = newDatabaseDirPath;
+    baseFolder = "./ctkDICOM-Database";
   }
   else
   {
-    // Have user select new database folder
-    // (cannot simply call d->DirectoryButton->browse() because it will cause circular calls)
-
-    // See https://bugreports.qt-project.org/browse/QTBUG-10244
-    class ExcludeReadOnlyFilterProxyModel : public QSortFilterProxyModel
+    // only use existing folder name as a basis if it is empty or
+    // a valid database
+    if (!QDir(baseFolder).isEmpty())
     {
-    public:
-      ExcludeReadOnlyFilterProxyModel(QPalette palette, QObject *parent)
-        : QSortFilterProxyModel(parent)
-        , Palette(palette)
+      QString databaseFileName = baseFolder + QString("/ctkDICOM.sql");
+      if (!QFile(databaseFileName).exists())
       {
+        // current folder is a non-empty and not a DICOM database folder
+        // create a subfolder for the new DICOM database based on the name
+        // of default database path
+        QFileInfo defaultFolderInfo(d->DefaultDatabasePath);
+        QString defaultSubfolderName = defaultFolderInfo.fileName();
+        if (defaultSubfolderName.isEmpty())
+        {
+          defaultSubfolderName = defaultFolderInfo.dir().dirName();
+        }          
+        baseFolder += "/" + defaultSubfolderName;
       }
-      virtual Qt::ItemFlags flags(const QModelIndex& index)const
-      {
-        QString filePath =
-          this->sourceModel()->data(this->mapToSource(index), QFileSystemModel::FilePathRole).toString();
-        if (!QFileInfo(filePath).isWritable())
-          {
-          // Double clickable (to open) but can't be "chosen".
-          return Qt::ItemIsSelectable;
-          }
-        return this->QSortFilterProxyModel::flags(index);
-      }
-      QPalette Palette;
-    };
-
-    QScopedPointer<ctkFileDialog> fileDialog(
-      new ctkFileDialog(this, "Choose existing database / Select empty folder for new DICOM database", this->databaseDirectory()));
-#ifdef USE_QFILEDIALOG_OPTIONS
-    fileDialog->setOptions(QFileDialog::ShowDirsOnly;
-#else
-    fileDialog->setOptions(QFlags<QFileDialog::Option>(int(ctkDirectoryButton::ShowDirsOnly)));
-#endif
-    fileDialog->setAcceptMode(QFileDialog::AcceptSave);
-    fileDialog->setFileMode(QFileDialog::DirectoryOnly);
-    // Gray out the non-writable folders. They can still be opened with double click,
-    // but they can't be selected because they don't have the ItemIsEnabled
-    // flag and because ctkFileDialog would not let it to be selected.
-    fileDialog->setProxyModel(
-      new ExcludeReadOnlyFilterProxyModel(this->palette(), fileDialog.data()));
-
-    if (fileDialog->exec())
-    {
-      dir = fileDialog->selectedFiles().at(0);
-    }
-    // An empty directory means either that the user canceled the dialog or the selected directory is readonly
-    if (dir.isEmpty())
-    {
-      qCritical() << Q_FUNC_INFO << ": Either user canceled database folder dialog or the selected directory is readonly";
-      return QString();
     }
   }
-
-  if (updateSchema)
+  // Remove existing numerical suffix
+  QString separator = "_";
+  bool isSuffixValid = false;
+  QString suffixStr = baseFolder.split(separator).last();
+  int suffixStart = suffixStr.toInt(&isSuffixValid);
+  if (isSuffixValid)
   {
-    d->showUpdateSchemaDialog();
-    d->DICOMDatabase->updateSchema(":/dicom/dicom-schema.sql", dir.toLatin1().constData());
+    QStringList baseFolderComponents = baseFolder.split(separator);
+    baseFolderComponents.removeLast();
+    baseFolder = baseFolderComponents.join(separator);
   }
+  // Try folder names, starting with the current one,
+  // incrementing the original numerical suffix.
+  int attemptsCount = 100;
+  for (int attempt=0; attempt<attemptsCount; attempt++)
+  {
+    QString newFolder = baseFolder;
+    int suffix = (suffixStart + attempt) % attemptsCount;
+    if (suffix)
+    {
+      newFolder += separator + QString::number(suffix);
+    }
+    if (!QDir(newFolder).exists())
+    {
+      if (!QDir().mkdir(newFolder))
+      {
+        continue;
+      }
+    }
+    if (!QDir(newFolder).isEmpty())
+    {
+      continue;
+    }
+    // Folder exists and empty, try to use this
+    setDatabaseDirectory(newFolder);
+    return;
+  }
+}
 
-  return dir;
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::onUpdateDatabase()
+{
+  Q_D(ctkDICOMBrowser);
+  d->showUpdateSchemaDialog();
+  QString dir = this->databaseDirectory();
+  // open DICOM database on the directory
+  QString databaseFileName = dir + QString("/ctkDICOM.sql");
+  try
+  {
+    d->DICOMDatabase->openDatabase(databaseFileName);
+  }
+  catch (std::exception e)
+  {
+    std::cerr << "Database error: " << qPrintable(d->DICOMDatabase->lastError()) << "\n";
+    d->DICOMDatabase->closeDatabase();
+    return;
+  }
+  d->DICOMDatabase->updateSchema(":/dicom/dicom-schema.sql", dir.toLatin1().constData());
+  // Update GUI
+  this->setDatabaseDirectory(dir);
 }
 
 //----------------------------------------------------------------------------
 void ctkDICOMBrowser::setDatabaseDirectory(const QString& directory)
 {
   Q_D(ctkDICOMBrowser);
+
+  // Save new database directory in settings.
+  QSettings settings;
+  settings.setValue(Self::databaseDirectorySettingsKey(), directory);
+  settings.sync();
 
   // If needed, create database directory
   if (!QDir(directory).exists())
@@ -577,6 +572,18 @@ void ctkDICOMBrowser::setDatabaseDirectory(const QString& directory)
 
   // open DICOM database on the directory
   QString databaseFileName = directory + QString("/ctkDICOM.sql");
+
+  if (!QDir(directory).isEmpty() && !QFile(databaseFileName).exists())
+  {
+    std::cerr << "Database folder does not contain ctkDICOM.sql file: " << qPrintable(directory) << "\n";
+    d->DatabaseDirectoryProblemFrame->show();
+    d->DatabaseDirectoryProblemLabel->setText(tr("No valid DICOM database found in folder %1.").arg(directory));
+    d->UpdateDatabaseButton->hide();
+    d->CreateNewDatabaseButton->show();
+    d->SelectDatabaseDirectoryButton->show();
+    return;
+  }
+
   try
   {
     d->DICOMDatabase->openDatabase( databaseFileName );
@@ -585,44 +592,38 @@ void ctkDICOMBrowser::setDatabaseDirectory(const QString& directory)
   {
     std::cerr << "Database error: " << qPrintable(d->DICOMDatabase->lastError()) << "\n";
     d->DICOMDatabase->closeDatabase();
+    d->DatabaseDirectoryProblemFrame->show();
+    d->DatabaseDirectoryProblemLabel->setText(tr("No valid DICOM database found in folder %1.").arg(directory));
+    d->UpdateDatabaseButton->hide();
+    d->CreateNewDatabaseButton->show();
+    d->SelectDatabaseDirectoryButton->show();
     return;
   }
 
-  // update the database schema if needed and provide progress
-  QString updatedDatabaseDirectory = this->updateDatabaseSchemaIfNeeded();
-  if (!updatedDatabaseDirectory.isEmpty())
+  if (d->DICOMDatabase->schemaVersionLoaded() != d->DICOMDatabase->schemaVersion())
   {
-    // close the active DICOM database, which needed to be updated
+    std::cerr << "Database version mismatch: version of selected database = " << qPrintable(d->DICOMDatabase->schemaVersionLoaded())
+      << ", version required = " << qPrintable(d->DICOMDatabase->schemaVersion()) << "\n";
     d->DICOMDatabase->closeDatabase();
-
-    // open DICOM database on the directory
-    QString updatedDatabaseFileName = updatedDatabaseDirectory + QString("/ctkDICOM.sql");
-    try
-    {
-      d->DICOMDatabase->openDatabase( updatedDatabaseFileName );
-    }
-    catch (std::exception e)
-    {
-      std::cerr << "Database error: " << qPrintable(d->DICOMDatabase->lastError()) << "\n";
-      d->DICOMDatabase->closeDatabase();
-      return;
-    }
+    d->DatabaseDirectoryProblemFrame->show();
+    d->DatabaseDirectoryProblemLabel->setText(tr("Incompatible DICOM database version found in folder %1.").arg(directory));
+    d->UpdateDatabaseButton->show();
+    d->CreateNewDatabaseButton->show();
+    d->SelectDatabaseDirectoryButton->show();
+    return;
   }
 
-  QString currentDatabaseDirectory(!updatedDatabaseDirectory.isEmpty() ? updatedDatabaseDirectory : directory);
-
-  // Save new database directory in settings.
-  QSettings settings;
-  settings.setValue(Self::databaseDirectorySettingsKey(), currentDatabaseDirectory);
-  settings.sync();
+  d->DatabaseDirectoryProblemFrame->hide();
 
   // pass DICOM database instance to Import widget
   d->QueryRetrieveWidget->setRetrieveDatabase(d->DICOMDatabase);
 
   // update the button and let any connected slots know about the change
-  d->DirectoryButton->setDirectory(currentDatabaseDirectory);
+  bool wasBlocked = d->DirectoryButton->blockSignals(true);
+  d->DirectoryButton->setDirectory(directory);
+  d->DirectoryButton->blockSignals(wasBlocked);
   d->dicomTableManager->updateTableViews();
-  emit databaseDirectoryChanged(currentDatabaseDirectory);
+  emit databaseDirectoryChanged(directory);
 }
 
 //----------------------------------------------------------------------------
@@ -966,54 +967,6 @@ void ctkDICOMBrowser::setImportDirectoryMode(ctkDICOMBrowser::ImportDirectoryMod
   }
   QComboBox* comboBox = d->ImportDialog->bottomWidget()->findChild<QComboBox*>();
   comboBox->setCurrentIndex(comboBox->findData(mode));
-}
-
-//----------------------------------------------------------------------------
-ctkDICOMBrowser::SchemaUpdateOption ctkDICOMBrowser::schemaUpdateOption()const
-{
-  Q_D(const ctkDICOMBrowser);
-  QSettings settings;
-  return ctkDICOMBrowser::schemaUpdateOptionFromString(
-    settings.value("DICOM/SchemaUpdateOption", ctkDICOMBrowser::schemaUpdateOptionToString(ctkDICOMBrowser::AlwaysUpdate)).toString() );
-}
-
-//----------------------------------------------------------------------------
-void ctkDICOMBrowser::setSchemaUpdateOption(ctkDICOMBrowser::SchemaUpdateOption option)
-{
-  Q_D(ctkDICOMBrowser);
-
-  QSettings settings;
-  settings.setValue("DICOM/SchemaUpdateOption", ctkDICOMBrowser::schemaUpdateOptionToString(option));
-}
-
-//----------------------------------------------------------------------------
-ctkDICOMBrowser::SchemaUpdateOption ctkDICOMBrowser::schemaUpdateOptionFromString(QString option)
-{
-  if (option == "NeverUpdate")
-  {
-    return ctkDICOMBrowser::NeverUpdate;
-  }
-  else if (option == "AskUser")
-  {
-    return ctkDICOMBrowser::AskUser;
-  }
-
-  // AlwaysUpdate is the default
-  return ctkDICOMBrowser::AlwaysUpdate;
-}
-
-//----------------------------------------------------------------------------
-QString ctkDICOMBrowser::schemaUpdateOptionToString(ctkDICOMBrowser::SchemaUpdateOption option)
-{
-  switch (option)
-  {
-  case ctkDICOMBrowser::NeverUpdate:
-    return "NeverUpdate";
-  case ctkDICOMBrowser::AskUser:
-    return "AskUser";
-  default:
-    return "AlwaysUpdate";
-  }
 }
 
 //----------------------------------------------------------------------------
@@ -1455,4 +1408,25 @@ void ctkDICOMBrowser::showUpdateDisplayedFieldsDialog()
   }
   d->UpdateDisplayedFieldsProgress->show();
   QApplication::processEvents();
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::setToolbarVisible(bool state)
+{
+  Q_D(ctkDICOMBrowser);
+  d->ToolBar->setVisible(state);
+}
+
+//----------------------------------------------------------------------------
+bool ctkDICOMBrowser::isToolbarVisible() const
+{
+  Q_D(const ctkDICOMBrowser);
+  return d->ToolBar->isVisible();
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::onSelectDatabaseDirectory()
+{
+  Q_D(const ctkDICOMBrowser);
+  d->DirectoryButton->browse();
 }

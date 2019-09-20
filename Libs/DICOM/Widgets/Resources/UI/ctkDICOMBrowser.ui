@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>802</width>
-    <height>607</height>
+    <height>718</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -30,7 +30,7 @@
     <number>0</number>
    </property>
    <property name="bottomMargin">
-    <number>12</number>
+    <number>0</number>
    </property>
    <item>
     <widget class="QToolBar" name="ToolBar">
@@ -49,57 +49,50 @@
     </widget>
    </item>
    <item>
-    <layout class="QVBoxLayout" name="VerticalLayout">
-     <property name="spacing">
-      <number>12</number>
+    <widget class="QFrame" name="DatabaseDirectoryProblemFrame">
+     <property name="styleSheet">
+      <string notr="true">background-color: rgb(245, 245, 170);</string>
      </property>
-     <item>
-      <layout class="QHBoxLayout" name="TopLayout">
-       <property name="leftMargin">
-        <number>12</number>
-       </property>
-       <property name="rightMargin">
-        <number>12</number>
-       </property>
-       <item>
-        <widget class="QLabel" name="DatabaseNameLabel">
-         <property name="maximumSize">
-          <size>
-           <width>100</width>
-           <height>20</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>LocalDatabase:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="ctkDirectoryButton" name="DirectoryButton">
-         <property name="minimumSize">
-          <size>
-           <width>200</width>
-           <height>20</height>
-          </size>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="HorizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </item>
-    </layout>
+     <property name="frameShape">
+      <enum>QFrame::Box</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <widget class="QLabel" name="DatabaseDirectoryProblemLabel">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string>Message.</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="UpdateDatabaseButton">
+        <property name="text">
+         <string>Update database</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="CreateNewDatabaseButton">
+        <property name="text">
+         <string>Create new database</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="SelectDatabaseDirectoryButton">
+        <property name="text">
+         <string>Select database folder</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </item>
    <item>
     <layout class="QHBoxLayout" name="QueryLayout" stretch="0">
@@ -114,6 +107,12 @@
      </property>
      <item>
       <widget class="ctkDICOMTableManager" name="dicomTableManager">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="dynamicTableLayout">
         <bool>true</bool>
        </property>
@@ -123,6 +122,9 @@
       </widget>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="ctkDirectoryButton" name="DirectoryButton"/>
    </item>
   </layout>
   <action name="ActionImport">
