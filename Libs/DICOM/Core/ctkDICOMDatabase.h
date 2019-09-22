@@ -293,6 +293,7 @@ public:
   Q_INVOKABLE void setFormatForField(QString table, QString field, QString format);
 
 Q_SIGNALS:
+
   /// Things inserted to database.
   /// patientAdded arguments:
   ///  - int: database index of patient (unique) within CTK database
@@ -310,6 +311,12 @@ Q_SIGNALS:
   /// instanceAdded arguments:
   ///  - instanceUID (unique)
   void instanceAdded(QString);
+
+  /// This signal is emitted when the database has been opened.
+  void opened();
+
+  /// This signal is emitted when the database has been closed.
+  void closed();
 
   /// Indicate that an in-memory database has been updated
   void databaseChanged();

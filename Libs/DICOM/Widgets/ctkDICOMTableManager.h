@@ -100,6 +100,18 @@ public:
   Q_INVOKABLE ctkDICOMTableView* studiesTable();
   Q_INVOKABLE ctkDICOMTableView* seriesTable();
 
+  /**
+  * @brief Get if view is in batch update mode.
+  * \sa setBatchUpdate
+  */
+  Q_INVOKABLE bool isBatchUpdate() const;
+  /**
+  * @brief Enable/disable batch update on the view.
+  * While in batch update mode, database changes will not update the view.
+  * When batch update is disabled then pending notifications are be processed.
+  */
+  Q_INVOKABLE bool setBatchUpdate(bool);
+
 public Q_SLOTS:
   void onPatientsQueryChanged(const QStringList&);
   void onStudiesQueryChanged(const QStringList&);

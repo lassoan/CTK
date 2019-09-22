@@ -401,3 +401,24 @@ ctkDICOMTableView* ctkDICOMTableManager::seriesTable()
   Q_D( ctkDICOMTableManager );
   return(d->seriesTable);
 }
+
+//------------------------------------------------------------------------------
+bool ctkDICOMTableManager::isBatchUpdate()const
+{
+  Q_D(const ctkDICOMTableManager);
+  return d->patientsTable->isBatchUpdate();
+}
+
+//------------------------------------------------------------------------------
+bool ctkDICOMTableManager::setBatchUpdate(bool enable)
+{
+  Q_D(ctkDICOMTableManager);
+  if (enable == this->isBatchUpdate())
+  {
+    return enable;
+  }
+  d->patientsTable->setBatchUpdate(enable);
+  d->studiesTable->setBatchUpdate(enable);
+  d->seriesTable->setBatchUpdate(enable);
+  return !enable;
+}

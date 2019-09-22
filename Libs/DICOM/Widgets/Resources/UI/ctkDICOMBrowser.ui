@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>802</width>
-    <height>718</height>
+    <width>566</width>
+    <height>445</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -66,7 +66,7 @@
          </sizepolicy>
         </property>
         <property name="text">
-         <string>Message.</string>
+         <string>Warning</string>
         </property>
        </widget>
       </item>
@@ -95,6 +95,38 @@
     </widget>
    </item>
    <item>
+    <widget class="QFrame" name="InformationMessageFrame">
+     <property name="frameShape">
+      <enum>QFrame::Box</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QLabel" name="InformationMessageLabel">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string>Information</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="InformationMessageDismissButton">
+        <property name="text">
+         <string>OK</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="QueryLayout" stretch="0">
      <property name="spacing">
       <number>0</number>
@@ -106,14 +138,14 @@
       <number>0</number>
      </property>
      <item>
-      <widget class="ctkDICOMTableManager" name="dicomTableManager">
+      <widget class="ctkDICOMTableManager" name="dicomTableManager" native="true">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
-       <property name="dynamicTableLayout">
+       <property name="dynamicTableLayout" stdset="0">
         <bool>true</bool>
        </property>
        <property name="m_DynamicLayout" stdset="0">
@@ -124,7 +156,7 @@
     </layout>
    </item>
    <item>
-    <widget class="ctkDirectoryButton" name="DirectoryButton"/>
+    <widget class="ctkDirectoryButton" name="DirectoryButton" native="true"/>
    </item>
   </layout>
   <action name="ActionImport">

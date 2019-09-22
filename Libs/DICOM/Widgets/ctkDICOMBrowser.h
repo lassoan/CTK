@@ -57,7 +57,7 @@ class CTK_DICOM_WIDGETS_EXPORT ctkDICOMBrowser : public QWidget
   Q_OBJECT
   Q_ENUMS(ImportDirectoryMode)
   Q_PROPERTY(QString databaseDirectory READ databaseDirectory WRITE setDatabaseDirectory)
-  //Q_PROPERTY(QString defaultDatabaseDirectoryName READ defaultDatabaseDirectoryName WRITE setDefaultDatabaseDirectoryName)
+  Q_PROPERTY(QString databaseDirectorySettingsKey READ databaseDirectorySettingsKey WRITE setDatabaseDirectorySettingsKey)
   Q_PROPERTY(int patientsAddedDuringImport READ patientsAddedDuringImport)
   Q_PROPERTY(int studiesAddedDuringImport READ studiesAddedDuringImport)
   Q_PROPERTY(int seriesAddedDuringImport READ seriesAddedDuringImport)
@@ -67,28 +67,25 @@ class CTK_DICOM_WIDGETS_EXPORT ctkDICOMBrowser : public QWidget
   Q_PROPERTY(ctkDICOMBrowser::ImportDirectoryMode ImportDirectoryMode READ importDirectoryMode WRITE setImportDirectoryMode)
   Q_PROPERTY(bool confirmRemove READ confirmRemove WRITE setConfirmRemove)
   Q_PROPERTY(bool toolbarVisible READ isToolbarVisible WRITE setToolbarVisible)
+  Q_PROPERTY(bool databaseDirectorySelectorVisible READ isDatabaseDirectorySelectorVisible WRITE setDatabaseDirectorySelectorVisible)
 
 public:
   typedef ctkDICOMBrowser Self;
 
   typedef QWidget Superclass;
-  /// databaseDirectorySettingsKey allows getting/setting different database folder from a custom settings key
-  /// This is useful if the user wants to use the old database with the older version application.
-  explicit ctkDICOMBrowser(QWidget* parent=0, QString databaseDirectorySettingsKey=QString());
+  explicit ctkDICOMBrowser(QWidget* parent=0);
   virtual ~ctkDICOMBrowser();
 
   /// Directory being used to store the dicom database
   QString databaseDirectory() const;
 
-  /*
-  QString defaultDatabaseDirectoryName() const;
-  void setDefaultDatabaseDirectoryName(const QString% directoryName) const;
-  */
+  /// Get settings key used to store DatabaseDirectory in application settings.
+  QString databaseDirectorySettingsKey() const;
 
-  /// Return settings key used to store the directory.
-  Q_INVOKABLE QString databaseDirectorySettingsKey() const;
-
-  Q_INVOKABLE static QString defaultDatabaseDirectorySettingsKey() { return QString("DatabaseDirectory"); };
+  /// Set settings key that stores DatabaseDirectory in application settings.
+  /// Calling this method sets DatabaseDirectory from current value stored in the settings
+  /// (overwriting current value of DatabaseDirectory).
+  void setDatabaseDirectorySettingsKey(const QString& settingsKey);
 
   /// See ctkDICOMDatabase for description - these accessors
   /// delegate to the corresponding routines of the internal
@@ -133,6 +130,10 @@ public:
 
   void setToolbarVisible(bool state);
   bool isToolbarVisible() const;
+
+  void setDatabaseDirectorySelectorVisible(bool state);
+  bool isDatabaseDirectorySelectorVisible() const;
+  
 
 public Q_SLOTS:
 
@@ -187,9 +188,15 @@ public Q_SLOTS:
   void onSeriesAdded(QString);
   void onInstanceAdded(QString);
 
-  void onSelectDatabaseDirectory();
-  void onCreateNewDatabaseDirectory();
-  void onUpdateDatabase();
+  /// Show pop-up window for the user to select database directory
+  void selectDatabaseDirectory();
+
+  /// Create new database directory.
+  /// Current database directory used as a basis.
+  void createNewDatabaseDirectory();
+
+  /// Update database in-place to required schema version
+  void updateDatabase();
 
   /// Show progress dialog for update displayed fields
   void showUpdateDisplayedFieldsDialog();

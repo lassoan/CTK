@@ -57,6 +57,11 @@ public:
 
   QStringList currentSelection;
 
+  bool batchUpdate;
+  /// Set to true if database modification is notified while in batch update mode
+  bool batchUpdateModificationPending;
+  bool batchUpdateInstanceAddedPending;
+
   /// Key = QString for columns, Values = QStringList
   QHash<QString, QStringList> sqlWhereConditions;
 
@@ -68,6 +73,9 @@ ctkDICOMTableViewPrivate::ctkDICOMTableViewPrivate(ctkDICOMTableView &obj)
 {
   this->dicomSQLFilterModel = new QSortFilterProxyModel(&obj);
   this->dicomDatabase = new ctkDICOMDatabase(&obj);
+  this->batchUpdate = false;
+  this->batchUpdateModificationPending = false;
+  this->batchUpdateInstanceAddedPending = false;
 }
 
 //------------------------------------------------------------------------------
@@ -157,7 +165,6 @@ void ctkDICOMTableViewPrivate::applyColumnProperties()
 {
   if (!this->dicomDatabase || !this->dicomDatabase->isOpen())
   {
-    qCritical() << Q_FUNC_INFO << ": Database not accessible";
     return;
   }
 
@@ -251,10 +258,11 @@ void ctkDICOMTableViewPrivate::applyColumnProperties()
   if (!visualIndexToColumnIndexMap.isEmpty())
   {
     QList<int> columnIndicesByVisualIndex = visualIndexToColumnIndexMap.values();
-    for (int i=0; i<columnCount-1; ++i)
+    int columnIndicesCount = columnIndicesByVisualIndex.size();
+    for (int i=0; i<columnIndicesCount-1; ++i)
     {
       // Last i elements are already in place    
-      for (int j=0; j<columnCount-i-1; ++j)
+      for (int j=0; j<columnIndicesCount -i-1; ++j)
       {
         if (columnIndicesByVisualIndex[j] > columnIndicesByVisualIndex[j+1])
         {
@@ -325,21 +333,36 @@ void ctkDICOMTableView::setDicomDataBase(ctkDICOMDatabase *dicomDatabase)
 {
   Q_D(ctkDICOMTableView);
 
-  //Do nothing if no database is set
-  if (!dicomDatabase)
+  if (d->dicomDatabase == dicomDatabase)
   {
+    // no change
     return;
   }
 
-  d->dicomDatabase = dicomDatabase;
+  if (d->dicomDatabase)
+  {
+    QObject::disconnect(d->dicomDatabase, SIGNAL(instanceAdded(const QString&)), this, SLOT(onInstanceAdded()));
+    QObject::disconnect(d->dicomDatabase, SIGNAL(databaseChanged()), this, SLOT(onDatabaseChanged()));
+    QObject::disconnect(d->dicomDatabase, SIGNAL(opened()), this, SLOT(onDatabaseOpened()));
+    QObject::disconnect(d->dicomDatabase, SIGNAL(closed()), this, SLOT(onDatabaseClosed()));
+    QObject::disconnect(d->dicomDatabase, SIGNAL(schemaUpdated()), this, SLOT(onDatabaseSchemaUpdated()));
+  }
 
-  //Create connections for new database
-  QObject::connect(d->dicomDatabase, SIGNAL(instanceAdded(const QString&)), this, SLOT(onInstanceAdded()));
-  QObject::connect(d->dicomDatabase, SIGNAL(databaseChanged()), this, SLOT(onDatabaseChanged()));
+  d->dicomDatabase = dicomDatabase;
+  if (d->dicomDatabase)
+  {
+    //Create connections for new database
+    QObject::connect(d->dicomDatabase, SIGNAL(instanceAdded(const QString&)), this, SLOT(onInstanceAdded()));
+    QObject::connect(d->dicomDatabase, SIGNAL(databaseChanged()), this, SLOT(onDatabaseChanged()));
+    QObject::connect(d->dicomDatabase, SIGNAL(opened()), this, SLOT(onDatabaseOpened()));
+    QObject::connect(d->dicomDatabase, SIGNAL(closed()), this, SLOT(onDatabaseClosed()));
+    QObject::connect(d->dicomDatabase, SIGNAL(schemaUpdated()), this, SLOT(onDatabaseSchemaUpdated()));
+  }
 
   this->setQuery();
-
   d->applyColumnProperties();
+
+  this->setEnabled(d->dicomDatabase && d->dicomDatabase->isOpen());
 }
 
 //------------------------------------------------------------------------------
@@ -363,13 +386,40 @@ void ctkDICOMTableView::onSelectionChanged()
 }
 
 //------------------------------------------------------------------------------
+void ctkDICOMTableView::onDatabaseOpened()
+{
+  Q_D(ctkDICOMTableView);
+  this->setQuery();
+  d->applyColumnProperties();
+  this->setEnabled(true);
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMTableView::onDatabaseClosed()
+{
+  Q_D(ctkDICOMTableView);
+  this->setQuery();
+  this->setEnabled(false);
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMTableView::onDatabaseSchemaUpdated()
+{
+  Q_D(ctkDICOMTableView);
+  this->setQuery();
+  d->applyColumnProperties();
+}
+
+//------------------------------------------------------------------------------
 void ctkDICOMTableView::onDatabaseChanged()
 {
   Q_D(ctkDICOMTableView);
-
+  if (d->batchUpdate)
+  {
+    d->batchUpdateModificationPending = true;
+    return;
+  }
   this->setQuery();
-
-  d->applyColumnProperties();
 }
 
 //------------------------------------------------------------------------------
@@ -404,6 +454,11 @@ void ctkDICOMTableView::onFilterChanged()
 void ctkDICOMTableView::onInstanceAdded()
 {
   Q_D(ctkDICOMTableView);
+  if (d->batchUpdate)
+  {
+    d->batchUpdateInstanceAddedPending = true;
+    return;
+  }
   d->sqlWhereConditions.clear();
   d->tblDicomDatabaseView->clearSelection();
   d->leSearchBox->clear();
@@ -482,6 +537,10 @@ void ctkDICOMTableView::setQuery(const QStringList &uids)
   {
     d->dicomSQLModel.setQuery(query.arg(d->queryTableName()), d->dicomDatabase->database());
   }
+  else
+  {
+    d->dicomSQLModel.clear();
+  }
 }
 
 void ctkDICOMTableView::addSqlWhereCondition(const std::pair<QString, QStringList> &condition)
@@ -550,5 +609,38 @@ void ctkDICOMTableView::onCustomContextMenuRequested(const QPoint &point)
 QTableView* ctkDICOMTableView::tableView()
 {
   Q_D( ctkDICOMTableView );
-  return(d->tblDicomDatabaseView);
+  return d->tblDicomDatabaseView;
+}
+
+//------------------------------------------------------------------------------
+bool ctkDICOMTableView::isBatchUpdate()const
+{
+  Q_D(const ctkDICOMTableView);
+  return d->batchUpdate;
+}
+
+//------------------------------------------------------------------------------
+bool ctkDICOMTableView::setBatchUpdate(bool enable)
+{
+  Q_D(ctkDICOMTableView);
+  if (enable == d->batchUpdate)
+  {
+    return d->batchUpdate;
+  }
+  d->batchUpdate = enable;
+  if (!d->batchUpdate)
+  {
+    // Process pending modification events
+    if (d->batchUpdateModificationPending)
+    {
+      this->onDatabaseChanged();
+    }
+    if (d->batchUpdateInstanceAddedPending)
+    {
+      this->onInstanceAdded();
+    }
+  }  
+  d->batchUpdateModificationPending = false;
+  d->batchUpdateInstanceAddedPending = false;
+  return !d->batchUpdate;
 }

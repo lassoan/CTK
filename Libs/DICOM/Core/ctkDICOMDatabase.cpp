@@ -472,6 +472,7 @@ void ctkDICOMDatabasePrivate::insertStudy(const ctkDICOMItem& ctkDataset, int db
   else
   {
     qDebug() << "Used existing study: " << studyInstanceUID;
+    this->LastStudyInstanceUID = studyInstanceUID;
   }
 }
 
@@ -539,6 +540,7 @@ void ctkDICOMDatabasePrivate::insertSeries(const ctkDICOMItem& ctkDataset, QStri
   else
   {
     qDebug() << "Used existing series: " << seriesInstanceUID;
+    this->LastSeriesInstanceUID = seriesInstanceUID;
   }
 }
 
@@ -644,7 +646,9 @@ void ctkDICOMDatabasePrivate::insert(const ctkDICOMItem& ctkDataset, const QStri
       QDateTime fileLastModified(QFileInfo(databaseFilename).lastModified());
       QDateTime databaseInsertTimestamp(QDateTime::fromString(fileExistsQuery.value(0).toString(),Qt::ISODate));
 
-      if ( databaseFilename == filePath && fileLastModified < databaseInsertTimestamp )
+      // Compare QFileInfo objects instead of path strings to ensure equivalent file names
+      // (such as same file name in uppercase/lowercase on Windows) are considered as equal.
+      if ( QFileInfo(databaseFilename) == QFileInfo(filePath)&& fileLastModified < databaseInsertTimestamp )
       {
         logger.debug ( "File " + databaseFilename + " already added" );
         return;
@@ -1244,6 +1248,7 @@ ctkDICOMDatabase::~ctkDICOMDatabase()
 void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& connectionName )
 {
   Q_D(ctkDICOMDatabase);
+  bool wasOpen = this->isOpen();
   d->DatabaseFileName = databaseFile;
   QString verifiedConnectionName = connectionName;
   if (verifiedConnectionName.isEmpty())
@@ -1255,6 +1260,10 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
   if ( ! (d->Database.open()) )
   {
     d->LastError = d->Database.lastError().text();
+    if (wasOpen)
+    {
+      emit closed();
+    }
     return;
   }
   if ( d->Database.tables().empty() )
@@ -1262,6 +1271,10 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     if (!this->initializeDatabase())
     {
       d->LastError = QString("Unable to initialize DICOM database!");
+      if (wasOpen)
+      {
+        emit closed();
+      }
       return;
     }
   }
@@ -1288,6 +1301,8 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
   }
 
   this->setTagsToPrecache(d->DisplayedFieldGenerator.getRequiredTags());
+
+  emit opened();
 }
 
 //------------------------------------------------------------------------------
@@ -1461,8 +1476,13 @@ bool ctkDICOMDatabase::updateSchema(
 void ctkDICOMDatabase::closeDatabase()
 {
   Q_D(ctkDICOMDatabase);
+  bool wasOpen = this->isOpen();
   d->Database.close();
   d->TagCacheDatabase.close();
+  if (wasOpen)
+  {
+    emit closed();
+  }
 }
 
 //

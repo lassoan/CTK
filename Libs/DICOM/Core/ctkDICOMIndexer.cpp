@@ -145,13 +145,8 @@ void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase& database,
   foreach(QString filePath, listOfFiles)
   {
     int percent = ( 100 * currentFileIndex ) / listOfFiles.size();
-    if (lastReportedPercent / 10 < percent / 10)
-    {
-      // Reporting progress has a huge overhead (pending events are processed,
-      // database is updated), therefore only report progress at every 10% increase
-      emit this->progress(percent);
-      lastReportedPercent = percent;
-    }
+    emit this->progress(percent);
+
     this->addFile(database, filePath, destinationDirectoryName);
     currentFileIndex++;
 

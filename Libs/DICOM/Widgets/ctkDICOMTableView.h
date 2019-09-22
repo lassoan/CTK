@@ -123,6 +123,20 @@ public:
   */
   Q_INVOKABLE QTableView* tableView();
 
+  /**
+  * @brief Get if view is in batch update mode.
+  * \sa setBatchUpdate
+  */
+  Q_INVOKABLE bool isBatchUpdate() const;
+
+  /**
+  * @brief Enable/disable batch update on the view.
+  * While in batch update mode, database changes will not update the view.
+  * When batch update is disabled then pending notifications are be processed.
+  * @return previous value of batch update
+  */
+  bool setBatchUpdate(bool);
+
 public Q_SLOTS:
   /**
    * @brief slot is called if the selection of the tableview is changed
@@ -159,6 +173,21 @@ public Q_SLOTS:
   void clearSelection();
 
 protected Q_SLOTS:
+  /**
+  * @brief Called when the database is opened
+  */
+  void onDatabaseOpened();
+
+  /**
+  * @brief Called when the database is closed
+  */
+  void onDatabaseClosed();
+
+  /**
+  * @brief Called when the database is schema is updated
+  */
+  void onDatabaseSchemaUpdated();
+
   /**
    * @brief Called when the underlying database changes
    */
