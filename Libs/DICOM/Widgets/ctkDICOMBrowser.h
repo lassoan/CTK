@@ -27,6 +27,8 @@
 
 #include "ctkDICOMWidgetsExport.h"
 
+#include "ctkDICOMModel.h"
+
 class ctkDICOMBrowserPrivate;
 class ctkDICOMDatabase;
 class ctkDICOMTableManager;
@@ -200,6 +202,11 @@ public Q_SLOTS:
 
   /// Show progress dialog for update displayed fields
   void showUpdateDisplayedFieldsDialog();
+
+  QStringList fileListForCurrentSelection(ctkDICOMModel::IndexType level);
+
+  /// Show window that displays DICOM fields of all selected items
+  void showMetadata(const QStringList& fileList);
 
 Q_SIGNALS:
   /// Emitted when directory is changed

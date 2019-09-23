@@ -23,6 +23,7 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDebug>
 #include <QDialogButtonBox>
@@ -50,16 +51,69 @@
 
 // ctkDICOMWidgets includes
 #include "ctkDICOMBrowser.h"
+#include "ctkDICOMObjectListWidget.h"
 #include "ctkDICOMQueryResultsTabWidget.h"
 #include "ctkDICOMQueryRetrieveWidget.h"
 #include "ctkDICOMQueryWidget.h"
 #include "ctkDICOMTableManager.h"
+#include "ctkDICOMTableView.h"
 
 #include "ui_ctkDICOMBrowser.h"
 
-//logger
-#include <ctkLogger.h>
-static ctkLogger logger("org.commontk.DICOM.Widgets.ctkDICOMBrowser");
+class ctkDICOMMetadataDialog : public QDialog
+{
+public:
+  ctkDICOMMetadataDialog(QWidget *parent = 0)
+    : QDialog(parent)
+  {
+    this->setWindowFlags(Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint | Qt::Window);
+    this->setModal(true);
+    this->setSizeGripEnabled(true);
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    layout->setMargin(0);
+    this->tagListWidget = new ctkDICOMObjectListWidget();
+    layout->addWidget(this->tagListWidget);
+  }
+
+  virtual ~ctkDICOMMetadataDialog()
+  {
+  }
+
+  void setFileList(const QStringList& fileList)
+  {
+    this->tagListWidget->setFileList(fileList);
+  }
+
+  void closeEvent(QCloseEvent *evt)
+  {
+    // just hide the window when close button is clicked
+    evt->ignore();
+    this->hide();
+  }
+
+  void showEvent(QShowEvent *event)
+  {
+    QDialog::showEvent(event);
+    // QDialog would reset window position and size when shown.
+    // Restore its previous size instead (user may look at metadata
+    // of different series one after the other and would be inconvenient to
+    // set the desired size manually each time).
+    if (!savedGeometry.isEmpty())
+    {
+      this->restoreGeometry(savedGeometry);
+    }
+  }
+
+  void hideEvent(QHideEvent *event)
+  {
+    this->savedGeometry = this->saveGeometry();
+    QDialog::hideEvent(event);
+  }
+
+protected:
+  ctkDICOMObjectListWidget* tagListWidget;
+  QByteArray savedGeometry;
+};
 
 //----------------------------------------------------------------------------
 class ctkDICOMBrowserPrivate: public Ui_ctkDICOMBrowser
@@ -78,6 +132,7 @@ public:
   void importOldSettings();
 
   ctkFileDialog* ImportDialog;
+  ctkDICOMMetadataDialog* MetadataDialog;
 
   ctkDICOMQueryRetrieveWidget* QueryRetrieveWidget;
 
@@ -149,6 +204,7 @@ public:
 ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   : q_ptr(parent)
   , ImportDialog(0)
+  , MetadataDialog(0)
   , QueryRetrieveWidget(0)
   , DICOMDatabase( QSharedPointer<ctkDICOMDatabase>(new ctkDICOMDatabase) )
   , DICOMIndexer( QSharedPointer<ctkDICOMIndexer>(new ctkDICOMIndexer) )
@@ -345,6 +401,10 @@ void ctkDICOMBrowserPrivate::init()
   this->ImportDialog->setWindowTitle("Import DICOM files from directory ...");
   this->ImportDialog->setWindowModality(Qt::ApplicationModal);
 
+  this->MetadataDialog = new ctkDICOMMetadataDialog();
+  this->MetadataDialog->setObjectName("DICOMMetadata");
+  this->MetadataDialog->setWindowTitle("DICOM File Metadata");
+
   //connect signal and slots
   q->connect(this->ImportDialog, SIGNAL(filesSelected(QStringList)),
           q,SLOT(onImportDirectoriesSelected(QStringList)));
@@ -375,6 +435,7 @@ ctkDICOMBrowser::~ctkDICOMBrowser()
 
   d->QueryRetrieveWidget->deleteLater();
   d->ImportDialog->deleteLater();
+  d->MetadataDialog->deleteLater();
 }
 
 //----------------------------------------------------------------------------
@@ -1095,25 +1156,33 @@ void ctkDICOMBrowser::onPatientsRightClicked(const QPoint &point)
 
   QMenu *patientsMenu = new QMenu(d->dicomTableManager);
 
+  QString metadataString = QString("View DICOM metadata of ")
+    + QString::number(numPatients)
+    + QString(" selected patients");
+  QAction *metadataAction = new QAction(metadataString, patientsMenu);
+  patientsMenu->addAction(metadataAction);
+
   QString deleteString = QString("Delete ")
     + QString::number(numPatients)
     + QString(" selected patients");
   QAction *deleteAction = new QAction(deleteString, patientsMenu);
-
   patientsMenu->addAction(deleteAction);
 
   QString exportString = QString("Export ")
     + QString::number(numPatients)
     + QString(" selected patients to file system");
   QAction *exportAction = new QAction(exportString, patientsMenu);
-
   patientsMenu->addAction(exportAction);
 
   // the table took care of mapping it to a global position so that the
   // menu will pop up at the correct place over this table.
   QAction *selectedAction = patientsMenu->exec(point);
 
-  if (selectedAction == deleteAction
+  if (selectedAction == metadataAction)
+  {
+    this->showMetadata(this->fileListForCurrentSelection(ctkDICOMModel::PatientType));
+  }
+  else if (selectedAction == deleteAction
       && this->confirmDeleteSelectedUIDs(selectedPatientsUIDs))
   {
     qDebug() << "Deleting " << numPatients << " patients";
@@ -1156,25 +1225,33 @@ void ctkDICOMBrowser::onStudiesRightClicked(const QPoint &point)
 
   QMenu *studiesMenu = new QMenu(d->dicomTableManager);
 
+  QString metadataString = QString("View DICOM metadata of ")
+    + QString::number(numStudies)
+    + QString(" selected studies");
+  QAction *metadataAction = new QAction(metadataString, studiesMenu);
+  studiesMenu->addAction(metadataAction);
+
   QString deleteString = QString("Delete ")
     + QString::number(numStudies)
     + QString(" selected studies");
   QAction *deleteAction = new QAction(deleteString, studiesMenu);
-
   studiesMenu->addAction(deleteAction);
 
   QString exportString = QString("Export ")
     + QString::number(numStudies)
     + QString(" selected studies to file system");
   QAction *exportAction = new QAction(exportString, studiesMenu);
-
   studiesMenu->addAction(exportAction);
 
   // the table took care of mapping it to a global position so that the
   // menu will pop up at the correct place over this table.
   QAction *selectedAction = studiesMenu->exec(point);
 
-  if (selectedAction == deleteAction
+  if (selectedAction == metadataAction)
+  {
+    this->showMetadata(this->fileListForCurrentSelection(ctkDICOMModel::StudyType));
+  }
+  else if (selectedAction == deleteAction
       && this->confirmDeleteSelectedUIDs(selectedStudiesUIDs))
   {
     foreach (const QString& uid, selectedStudiesUIDs)
@@ -1216,11 +1293,16 @@ void ctkDICOMBrowser::onSeriesRightClicked(const QPoint &point)
 
   QMenu *seriesMenu = new QMenu(d->dicomTableManager);
 
+  QString metadataString = QString("View DICOM metadata of ")
+    + QString::number(numSeries)
+    + QString(" selected series");
+  QAction *metadataAction = new QAction(metadataString, seriesMenu);
+  seriesMenu->addAction(metadataAction);
+
   QString deleteString = QString("Delete ")
     + QString::number(numSeries)
     + QString(" selected series");
   QAction *deleteAction = new QAction(deleteString, seriesMenu);
-
   seriesMenu->addAction(deleteAction);
 
   QString exportString = QString("Export ")
@@ -1233,7 +1315,11 @@ void ctkDICOMBrowser::onSeriesRightClicked(const QPoint &point)
   // menu will pop up at the correct place over this table.
   QAction *selectedAction = seriesMenu->exec(point);
 
-  if (selectedAction == deleteAction
+  if (selectedAction == metadataAction)
+  {
+    this->showMetadata(this->fileListForCurrentSelection(ctkDICOMModel::SeriesType));
+  }
+  else if (selectedAction == deleteAction
       && this->confirmDeleteSelectedUIDs(selectedSeriesUIDs))
   {
     foreach (const QString& uid, selectedSeriesUIDs)
@@ -1406,11 +1492,11 @@ void ctkDICOMBrowser::exportSelectedStudies(QString dirPath, QStringList uids)
 {
   Q_D(ctkDICOMBrowser);
 
-  foreach (const QString& uid, uids)
-  {
-    QStringList seriesUIDs = d->DICOMDatabase->seriesForStudy(uid);
-    this->exportSelectedSeries(dirPath, seriesUIDs);
-  }
+foreach(const QString& uid, uids)
+{
+  QStringList seriesUIDs = d->DICOMDatabase->seriesForStudy(uid);
+  this->exportSelectedSeries(dirPath, seriesUIDs);
+}
 }
 
 //----------------------------------------------------------------------------
@@ -1418,7 +1504,7 @@ void ctkDICOMBrowser::exportSelectedPatients(QString dirPath, QStringList uids)
 {
   Q_D(ctkDICOMBrowser);
 
-  foreach (const QString& uid, uids)
+  foreach(const QString& uid, uids)
   {
     QStringList studiesUIDs = d->DICOMDatabase->studiesForPatient(uid);
     this->exportSelectedStudies(dirPath, studiesUIDs);
@@ -1478,7 +1564,6 @@ bool ctkDICOMBrowser::isDatabaseDirectorySelectorVisible() const
   return d->DirectoryButton->isVisible();
 }
 
-
 //----------------------------------------------------------------------------
 void ctkDICOMBrowser::selectDatabaseDirectory()
 {
@@ -1486,4 +1571,52 @@ void ctkDICOMBrowser::selectDatabaseDirectory()
   d->InformationMessageFrame->hide();
   d->DatabaseDirectoryProblemFrame->hide();
   d->DirectoryButton->browse();
+}
+
+//----------------------------------------------------------------------------
+QStringList ctkDICOMBrowser::fileListForCurrentSelection(ctkDICOMModel::IndexType level)
+{
+  Q_D(const ctkDICOMBrowser);
+
+  QStringList selectedStudyUIDs;
+  if (level == ctkDICOMModel::PatientType)
+  {
+    QStringList uids = d->dicomTableManager->currentPatientsSelection();
+    foreach(const QString& uid, uids)
+    {
+      selectedStudyUIDs << d->DICOMDatabase->studiesForPatient(uid);
+    }
+  }
+  if (level == ctkDICOMModel::StudyType)
+  {
+    selectedStudyUIDs = d->dicomTableManager->currentStudiesSelection();
+  }
+
+  QStringList selectedSeriesUIDs;
+  if (level == ctkDICOMModel::SeriesType)
+  {
+    selectedSeriesUIDs = d->dicomTableManager->currentSeriesSelection();
+  }
+  else
+  {
+    foreach(const QString& uid, selectedStudyUIDs)
+    {
+      selectedSeriesUIDs << d->DICOMDatabase->seriesForStudy(uid);
+    }
+  }
+
+  QStringList fileList;
+  foreach(const QString& selectedSeriesUID, selectedSeriesUIDs)
+  {
+    fileList << d->DICOMDatabase->filesForSeries(selectedSeriesUID);
+  }
+  return fileList;
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::showMetadata(const QStringList& fileList)
+{
+  Q_D(const ctkDICOMBrowser);
+  d->MetadataDialog->setFileList(fileList);
+  d->MetadataDialog->show();
 }
