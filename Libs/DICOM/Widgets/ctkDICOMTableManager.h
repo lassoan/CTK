@@ -74,7 +74,7 @@ public:
    */
   Q_INVOKABLE void setDICOMDatabase(ctkDICOMDatabase* db);
 
-  void setTableOrientation(const Qt::Orientation&) const;
+  void setTableOrientation(const Qt::Orientation&);
   Qt::Orientation tableOrientation();
 
   /**
@@ -117,6 +117,11 @@ public Q_SLOTS:
   void onStudiesQueryChanged(const QStringList&);
   void onPatientsSelectionChanged(const QStringList&);
   void onStudiesSelectionChanged(const QStringList&);
+
+protected Q_SLOTS:
+  void showPatientsFilterActiveWarning(bool);
+  void showStudiesFilterActiveWarning(bool);
+  void showSeriesFilterActiveWarning(bool);
 
 Q_SIGNALS:
   /// Signals for propagating selection changes of the different tables

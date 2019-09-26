@@ -207,7 +207,9 @@ void ctkDICOMQueryRetrieveWidget::query()
               this, SLOT(onQueryProgressChanged(int)));
 
       // run the query against the selected server and put results in database
+      bool wasBatchUpdate = d->dicomTableManager->setBatchUpdate(true);
       query->query ( d->QueryResultDatabase );
+      d->dicomTableManager->setBatchUpdate(wasBatchUpdate);
 
       disconnect(query, SIGNAL(progress(QString)),
                  progressLabel, SLOT(setText(QString)));

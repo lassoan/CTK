@@ -152,6 +152,7 @@ public:
   bool DisplayImportSummary;
   bool ConfirmRemove;
   bool ShemaUpdateAutoCreateDirectory;
+  bool SendActionVisible;
 
   // local count variables to keep track of the number of items
   // added to the database during an import operation
@@ -167,6 +168,8 @@ public:
   QString DefaultDatabaseDirectory;
   QString DatabaseDirectory;
 };
+
+CTK_GET_CPP(ctkDICOMBrowser, bool, isSendActionVisible, SendActionVisible);
 
 //----------------------------------------------------------------------------
 class ctkDICOMImportStats
@@ -220,6 +223,7 @@ ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   , SeriesAddedDuringImport(0)
   , InstancesAddedDuringImport(0)
   , DefaultDatabaseDirectory("./ctkDICOM-Database")
+  , SendActionVisible(false)
 {
 }
 
@@ -785,7 +789,15 @@ void ctkDICOMBrowser::openImportDialog()
 //----------------------------------------------------------------------------
 void ctkDICOMBrowser::openExportDialog()
 {
+  // Export selected series
+  this->exportSelectedItems(ctkDICOMModel::SeriesType);
+}
 
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::openSendDialog()
+{
+  // Export selected series
+  emit sendRequested(this->fileListForCurrentSelection(ctkDICOMModel::SeriesType));
 }
 
 //----------------------------------------------------------------------------
@@ -807,31 +819,7 @@ void ctkDICOMBrowser::onQueryRetrieveFinished()
 void ctkDICOMBrowser::onRemoveAction()
 {
   Q_D(ctkDICOMBrowser);
-
-  QStringList selectedPatientUIDs = d->dicomTableManager->currentPatientsSelection();
-
-  // Confirm removal if needed. Note that this function always removes the patient
-  if (d->ConfirmRemove && !this->confirmDeleteSelectedUIDs(selectedPatientUIDs))
-  {
-    return;
-  }
-
-  QStringList selectedSeriesUIDs = d->dicomTableManager->currentSeriesSelection();
-  foreach (const QString& uid, selectedSeriesUIDs)
-  {
-    d->DICOMDatabase->removeSeries(uid);
-  }
-  QStringList selectedStudiesUIDs = d->dicomTableManager->currentStudiesSelection();
-  foreach (const QString& uid, selectedStudiesUIDs)
-  {
-    d->DICOMDatabase->removeStudy(uid);
-  }
-  foreach (const QString& uid, selectedPatientUIDs)
-  {
-    d->DICOMDatabase->removePatient(uid);
-  }
-  // Update the table views
-  d->dicomTableManager->updateTableViews();
+  this->removeSelectedItems(ctkDICOMModel::SeriesType);
 }
 
 //----------------------------------------------------------------------------
@@ -862,6 +850,10 @@ void ctkDICOMBrowser::onRepairAction()
 
   if (corruptedSeries.size() == 0)
   {
+    bool wasBatchUpdate = d->dicomTableManager->setBatchUpdate(true);
+    d->DICOMDatabase->updateDisplayedFields();
+    d->dicomTableManager->setBatchUpdate(wasBatchUpdate);
+
     repairMessageBox->setText("All the files in the local database are available.");
     repairMessageBox->addButton(QMessageBox::Ok);
     repairMessageBox->exec();
@@ -872,7 +864,7 @@ void ctkDICOMBrowser::onRepairAction()
     repairMessageBox->addButton(QMessageBox::No);
     QSet<QString>::iterator i;
     for (i = corruptedSeries.begin(); i != corruptedSeries.end(); ++i)
-      {
+    {
       QStringList fileList (d->DICOMDatabase->filesForSeries(*i));
       QString unavailableFileNames;
       QStringList::const_iterator it;
@@ -899,6 +891,10 @@ void ctkDICOMBrowser::onRepairAction()
         d->dicomTableManager->updateTableViews();
       }
     }
+
+    bool wasBatchUpdate = d->dicomTableManager->setBatchUpdate(true);
+    d->DICOMDatabase->updateDisplayedFields();
+    d->dicomTableManager->setBatchUpdate(wasBatchUpdate);
   }
 }
 
@@ -995,7 +991,8 @@ void ctkDICOMBrowser::importDirectory(QString directory, ctkDICOMBrowser::Import
   d->importDirectory(directory, mode);
   if (d->DisplayImportSummary)
   {
-    QMessageBox::information(d->ImportDialog,"DICOM Directory Import", stats.summary());
+    d->InformationMessageLabel->setText(stats.summary());
+    d->InformationMessageFrame->show();
   }
 }
 
@@ -1077,6 +1074,8 @@ void ctkDICOMBrowser::onModelSelected(const QItemSelection &item1, const QItemSe
   Q_UNUSED(item2);
   Q_D(ctkDICOMBrowser);
   d->ActionRemove->setEnabled(true);
+  d->ActionSend->setEnabled(true);
+  d->ActionExport->setEnabled(true);
 }
 
 //----------------------------------------------------------------------------
@@ -1155,24 +1154,34 @@ void ctkDICOMBrowser::onPatientsRightClicked(const QPoint &point)
   }
 
   QMenu *patientsMenu = new QMenu(d->dicomTableManager);
+  QString selectedPatientsCount;
+  if (numPatients > 1)
+  {
+    selectedPatientsCount = QString(" %1 selected patients").arg(numPatients);
+  }
 
-  QString metadataString = QString("View DICOM metadata of ")
-    + QString::number(numPatients)
-    + QString(" selected patients");
+  QString metadataString = QString("View DICOM metadata");
+  if (numPatients > 1)
+  {
+    metadataString += QString(" of") + selectedPatientsCount;
+  }
   QAction *metadataAction = new QAction(metadataString, patientsMenu);
   patientsMenu->addAction(metadataAction);
 
-  QString deleteString = QString("Delete ")
-    + QString::number(numPatients)
-    + QString(" selected patients");
+  QString deleteString = QString("Delete") + selectedPatientsCount;
   QAction *deleteAction = new QAction(deleteString, patientsMenu);
   patientsMenu->addAction(deleteAction);
 
-  QString exportString = QString("Export ")
-    + QString::number(numPatients)
-    + QString(" selected patients to file system");
+  QString exportString = QString("Export%1 to file system").arg(selectedPatientsCount);
   QAction *exportAction = new QAction(exportString, patientsMenu);
   patientsMenu->addAction(exportAction);
+
+  QString sendString = QString("Send%1 to DICOM server").arg(selectedPatientsCount);
+  QAction* sendAction = new QAction(sendString, patientsMenu);
+  if (this->isSendActionVisible())
+  {
+    patientsMenu->addAction(sendAction);
+  }
 
   // the table took care of mapping it to a global position so that the
   // menu will pop up at the correct place over this table.
@@ -1182,30 +1191,17 @@ void ctkDICOMBrowser::onPatientsRightClicked(const QPoint &point)
   {
     this->showMetadata(this->fileListForCurrentSelection(ctkDICOMModel::PatientType));
   }
-  else if (selectedAction == deleteAction
-      && this->confirmDeleteSelectedUIDs(selectedPatientsUIDs))
+  else if (selectedAction == deleteAction)
   {
-    qDebug() << "Deleting " << numPatients << " patients";
-    foreach (const QString& uid, selectedPatientsUIDs)
-    {
-      d->DICOMDatabase->removePatient(uid);
-      d->dicomTableManager->updateTableViews();
-    }
+    this->removeSelectedItems(ctkDICOMModel::PatientType);
   }
   else if (selectedAction == exportAction)
   {
-    ctkFileDialog* directoryDialog = new ctkFileDialog();
-    directoryDialog->setOption(QFileDialog::DontUseNativeDialog);
-    directoryDialog->setOption(QFileDialog::ShowDirsOnly);
-    directoryDialog->setFileMode(QFileDialog::DirectoryOnly);
-    bool res = directoryDialog->exec();
-    if (res)
-    {
-      QStringList dirs = directoryDialog->selectedFiles();
-      QString dirPath = dirs[0];
-      this->exportSelectedPatients(dirPath, selectedPatientsUIDs);
-    }
-    delete directoryDialog;
+    this->exportSelectedItems(ctkDICOMModel::PatientType);
+  }
+  else if (selectedAction == sendAction)
+  {
+    emit sendRequested(this->fileListForCurrentSelection(ctkDICOMModel::PatientType));
   }
 }
 
@@ -1224,24 +1220,34 @@ void ctkDICOMBrowser::onStudiesRightClicked(const QPoint &point)
   }
 
   QMenu *studiesMenu = new QMenu(d->dicomTableManager);
+  QString selectedStudiesCount;
+  if (numStudies > 1)
+  {
+    selectedStudiesCount = QString(" %1 selected studies").arg(numStudies);
+  }
 
-  QString metadataString = QString("View DICOM metadata of ")
-    + QString::number(numStudies)
-    + QString(" selected studies");
+  QString metadataString = QString("View DICOM metadata");
+  if (numStudies > 1)
+  {
+    metadataString += QString(" of") + selectedStudiesCount;
+  }
   QAction *metadataAction = new QAction(metadataString, studiesMenu);
   studiesMenu->addAction(metadataAction);
 
-  QString deleteString = QString("Delete ")
-    + QString::number(numStudies)
-    + QString(" selected studies");
+  QString deleteString = QString("Delete") + selectedStudiesCount;
   QAction *deleteAction = new QAction(deleteString, studiesMenu);
   studiesMenu->addAction(deleteAction);
 
-  QString exportString = QString("Export ")
-    + QString::number(numStudies)
-    + QString(" selected studies to file system");
+  QString exportString = QString("Export%1 to file system").arg(selectedStudiesCount);
   QAction *exportAction = new QAction(exportString, studiesMenu);
   studiesMenu->addAction(exportAction);
+
+  QString sendString = QString("Send%1 to DICOM server").arg(selectedStudiesCount);
+  QAction* sendAction = new QAction(sendString, studiesMenu);
+  if (this->isSendActionVisible())
+  {
+    studiesMenu->addAction(sendAction);
+  }
 
   // the table took care of mapping it to a global position so that the
   // menu will pop up at the correct place over this table.
@@ -1262,18 +1268,11 @@ void ctkDICOMBrowser::onStudiesRightClicked(const QPoint &point)
   }
   else if (selectedAction == exportAction)
   {
-    ctkFileDialog* directoryDialog = new ctkFileDialog();
-    directoryDialog->setOption(QFileDialog::DontUseNativeDialog);
-    directoryDialog->setOption(QFileDialog::ShowDirsOnly);
-    directoryDialog->setFileMode(QFileDialog::DirectoryOnly);
-    bool res = directoryDialog->exec();
-    if (res)
-    {
-      QStringList dirs = directoryDialog->selectedFiles();
-      QString dirPath = dirs[0];
-      this->exportSelectedStudies(dirPath, selectedStudiesUIDs);
-    }
-    delete directoryDialog;
+    this->exportSelectedItems(ctkDICOMModel::StudyType);
+  }
+  else if (selectedAction == sendAction)
+  {
+    emit sendRequested(this->fileListForCurrentSelection(ctkDICOMModel::StudyType));
   }
 }
 
@@ -1292,24 +1291,34 @@ void ctkDICOMBrowser::onSeriesRightClicked(const QPoint &point)
   }
 
   QMenu *seriesMenu = new QMenu(d->dicomTableManager);
+  QString selectedSeriesCount;
+  if (numSeries > 1)
+  {
+    selectedSeriesCount = QString(" %1 selected series").arg(numSeries);
 
-  QString metadataString = QString("View DICOM metadata of ")
-    + QString::number(numSeries)
-    + QString(" selected series");
+  }
+  QString metadataString = QString("View DICOM metadata");
+  if (numSeries > 1)
+  {
+    metadataString += QString(" of") + selectedSeriesCount;
+  }
   QAction *metadataAction = new QAction(metadataString, seriesMenu);
   seriesMenu->addAction(metadataAction);
 
-  QString deleteString = QString("Delete ")
-    + QString::number(numSeries)
-    + QString(" selected series");
+  QString deleteString = QString("Delete") + selectedSeriesCount;
   QAction *deleteAction = new QAction(deleteString, seriesMenu);
   seriesMenu->addAction(deleteAction);
 
-  QString exportString = QString("Export ")
-    + QString::number(numSeries)
-    + QString(" selected series to file system");
+  QString exportString = QString("Export%1 to file system").arg(selectedSeriesCount);
   QAction *exportAction = new QAction(exportString, seriesMenu);
   seriesMenu->addAction(exportAction);
+
+  QString sendString = QString("Send%1 to DICOM server").arg(selectedSeriesCount);
+  QAction* sendAction = new QAction(sendString, seriesMenu);
+  if (this->isSendActionVisible())
+  {
+    seriesMenu->addAction(sendAction);
+  }
 
   // the table took care of mapping it to a global position so that the
   // menu will pop up at the correct place over this table.
@@ -1330,23 +1339,17 @@ void ctkDICOMBrowser::onSeriesRightClicked(const QPoint &point)
   }
   else if (selectedAction == exportAction)
   {
-    ctkFileDialog* directoryDialog = new ctkFileDialog();
-    directoryDialog->setOption(QFileDialog::DontUseNativeDialog);
-    directoryDialog->setOption(QFileDialog::ShowDirsOnly);
-    directoryDialog->setFileMode(QFileDialog::DirectoryOnly);
-    bool res = directoryDialog->exec();
-    if (res)
-    {
-      QStringList dirs = directoryDialog->selectedFiles();
-      QString dirPath = dirs[0];
-      this->exportSelectedSeries(dirPath, selectedSeriesUIDs);
-    }
-    delete directoryDialog;
+    this->exportSelectedItems(ctkDICOMModel::SeriesType);
   }
+  else if (selectedAction == sendAction)
+  {
+    emit sendRequested(this->fileListForCurrentSelection(ctkDICOMModel::SeriesType));
+  }
+
 }
 
 //----------------------------------------------------------------------------
-void ctkDICOMBrowser::exportSelectedSeries(QString dirPath, QStringList uids)
+void ctkDICOMBrowser::exportSeries(QString dirPath, QStringList uids)
 {
   Q_D(ctkDICOMBrowser);
 
@@ -1488,30 +1491,6 @@ void ctkDICOMBrowser::exportSelectedSeries(QString dirPath, QStringList uids)
 }
 
 //----------------------------------------------------------------------------
-void ctkDICOMBrowser::exportSelectedStudies(QString dirPath, QStringList uids)
-{
-  Q_D(ctkDICOMBrowser);
-
-foreach(const QString& uid, uids)
-{
-  QStringList seriesUIDs = d->DICOMDatabase->seriesForStudy(uid);
-  this->exportSelectedSeries(dirPath, seriesUIDs);
-}
-}
-
-//----------------------------------------------------------------------------
-void ctkDICOMBrowser::exportSelectedPatients(QString dirPath, QStringList uids)
-{
-  Q_D(ctkDICOMBrowser);
-
-  foreach(const QString& uid, uids)
-  {
-    QStringList studiesUIDs = d->DICOMDatabase->studiesForPatient(uid);
-    this->exportSelectedStudies(dirPath, studiesUIDs);
-  }
-}
-
-//----------------------------------------------------------------------------
 void ctkDICOMBrowser::showUpdateDisplayedFieldsDialog()
 {
   Q_D(ctkDICOMBrowser);
@@ -1548,6 +1527,14 @@ bool ctkDICOMBrowser::isToolbarVisible() const
 {
   Q_D(const ctkDICOMBrowser);
   return d->ToolBar->isVisible();
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::setSendActionVisible(bool visible)
+{
+  Q_D(ctkDICOMBrowser);
+  d->SendActionVisible = visible;
+  d->ActionSend->setVisible(visible);
 }
 
 //----------------------------------------------------------------------------
@@ -1619,4 +1606,112 @@ void ctkDICOMBrowser::showMetadata(const QStringList& fileList)
   Q_D(const ctkDICOMBrowser);
   d->MetadataDialog->setFileList(fileList);
   d->MetadataDialog->show();
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::exportSelectedItems(ctkDICOMModel::IndexType level)
+{
+  Q_D(const ctkDICOMBrowser);
+  ctkFileDialog* directoryDialog = new ctkFileDialog();
+  directoryDialog->setOption(QFileDialog::DontUseNativeDialog);
+  directoryDialog->setOption(QFileDialog::ShowDirsOnly);
+  directoryDialog->setFileMode(QFileDialog::DirectoryOnly);
+  bool res = directoryDialog->exec();
+  if (!res)
+  {
+    delete directoryDialog;
+    return;
+  }
+  QStringList dirs = directoryDialog->selectedFiles();
+  delete directoryDialog;
+  QString dirPath = dirs[0];
+
+  QStringList selectedStudyUIDs;
+  if (level == ctkDICOMModel::PatientType)
+  {
+    QStringList uids = d->dicomTableManager->currentPatientsSelection();
+    foreach(const QString & uid, uids)
+    {
+      selectedStudyUIDs << d->DICOMDatabase->studiesForPatient(uid);
+    }
+  }
+  if (level == ctkDICOMModel::StudyType)
+  {
+    selectedStudyUIDs = d->dicomTableManager->currentStudiesSelection();
+  }
+
+  QStringList selectedSeriesUIDs;
+  if (level == ctkDICOMModel::SeriesType)
+  {
+    selectedSeriesUIDs = d->dicomTableManager->currentSeriesSelection();
+  }
+  else
+  {
+    foreach(const QString & uid, selectedStudyUIDs)
+    {
+      selectedSeriesUIDs << d->DICOMDatabase->seriesForStudy(uid);
+    }
+  }
+
+  this->exportSeries(dirPath, selectedSeriesUIDs);
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::removeSelectedItems(ctkDICOMModel::IndexType level)
+{
+  Q_D(const ctkDICOMBrowser);
+  QStringList selectedPatientUIDs;
+  QStringList selectedStudyUIDs;
+  if (level == ctkDICOMModel::PatientType)
+  {
+    selectedPatientUIDs = d->dicomTableManager->currentPatientsSelection();
+    if (!this->confirmDeleteSelectedUIDs(selectedPatientUIDs))
+    {
+      return;
+    }
+    foreach(const QString & uid, selectedPatientUIDs)
+    {
+      selectedStudyUIDs << d->DICOMDatabase->studiesForPatient(uid);
+    }
+  }
+  if (level == ctkDICOMModel::StudyType)
+  {
+    selectedStudyUIDs = d->dicomTableManager->currentStudiesSelection();
+    if (!this->confirmDeleteSelectedUIDs(selectedStudyUIDs))
+    {
+      return;
+    }
+  }
+
+  QStringList selectedSeriesUIDs;
+  if (level == ctkDICOMModel::SeriesType)
+  {
+    selectedSeriesUIDs = d->dicomTableManager->currentSeriesSelection();
+    if (!this->confirmDeleteSelectedUIDs(selectedSeriesUIDs))
+    {
+      return;
+    }
+  }
+  else
+  {
+    foreach(const QString & uid, selectedStudyUIDs)
+    {
+      selectedSeriesUIDs << d->DICOMDatabase->seriesForStudy(uid);
+    }
+  }
+
+  foreach(const QString & uid, selectedSeriesUIDs)
+  {
+    d->DICOMDatabase->removeSeries(uid);
+  }
+  foreach(const QString & uid, selectedStudyUIDs)
+  {
+    d->DICOMDatabase->removeStudy(uid);
+  }
+  foreach(const QString & uid, selectedPatientUIDs)
+  {
+    d->DICOMDatabase->removePatient(uid);
+  }
+  // Update the table views
+  d->dicomTableManager->updateTableViews();
 }

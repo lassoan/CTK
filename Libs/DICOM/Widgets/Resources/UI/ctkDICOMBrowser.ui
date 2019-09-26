@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>566</width>
+    <width>583</width>
     <height>445</height>
    </rect>
   </property>
@@ -175,7 +175,7 @@
     <string>Export</string>
    </property>
    <property name="toolTip">
-    <string>Export selected study/series to a DICOM folder (not yet available)</string>
+    <string>Export selected series to a DICOM folder</string>
    </property>
   </action>
   <action name="ActionQuery">
@@ -183,7 +183,7 @@
     <string>Query</string>
    </property>
    <property name="toolTip">
-    <string>Query and Retrieve DICOM studies from a DICOM node</string>
+    <string>Query and retrieve studies from a DICOM server</string>
    </property>
   </action>
   <action name="ActionSend">
@@ -194,7 +194,7 @@
     <string>Send</string>
    </property>
    <property name="toolTip">
-    <string>Send DICOM Studies to a DICOM node (not yet available)</string>
+    <string>Send selected series to DICOM server</string>
    </property>
   </action>
   <action name="ActionRemove">
@@ -205,7 +205,7 @@
     <string>Remove</string>
    </property>
    <property name="toolTip">
-    <string>Remove selected series, studies, patients from database</string>
+    <string>Remove selected series from database</string>
    </property>
   </action>
   <action name="ActionRepair">
@@ -319,11 +319,28 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>ActionSend</sender>
+   <signal>triggered()</signal>
+   <receiver>ctkDICOMBrowser</receiver>
+   <slot>openSendDialog()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>291</x>
+     <y>222</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>openImportDialog()</slot>
   <slot>openExportDialog()</slot>
   <slot>openQueryDialog()</slot>
+  <slot>openSendDialog()</slot>
   <slot>onDatabaseDirectoryChaged(QString)</slot>
   <slot>onNextImage()</slot>
   <slot>onPreviousImage()</slot>

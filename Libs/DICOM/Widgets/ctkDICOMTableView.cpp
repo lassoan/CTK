@@ -133,10 +133,7 @@ void ctkDICOMTableViewPrivate::init()
                    SIGNAL(customContextMenuRequested(const QPoint&)),
                    q, SLOT(onCustomContextMenuRequested(const QPoint&)));
 
-  QObject::connect(this->leSearchBox, SIGNAL(textChanged(QString)),
-                   this->dicomSQLFilterModel, SLOT(setFilterWildcard(QString)));
-
-  QObject::connect(this->leSearchBox, SIGNAL(textChanged(QString)), q, SLOT(onFilterChanged()));
+  QObject::connect(this->leSearchBox, SIGNAL(textChanged(QString)), q, SLOT(onFilterChanged(QString)));
 }
 
 //----------------------------------------------------------------------------
@@ -429,25 +426,39 @@ void ctkDICOMTableView::onUpdateQuery(const QStringList& uids)
 
   this->setQuery(uids);
 
-  d->showFilterActiveWarning( d->dicomSQLFilterModel->rowCount() == 0 &&
-                              d->leSearchBox->text().length() != 0 );
+  bool showWarning = d->dicomSQLFilterModel->rowCount() == 0 &&
+    d->leSearchBox->text().length() != 0;
+  d->showFilterActiveWarning(showWarning);
+  emit showFilterActiveWarning(showWarning);
 
   const QStringList& newUIDS = this->uidsForAllRows();
   emit queryChanged(newUIDS);
 }
 
 //------------------------------------------------------------------------------
-void ctkDICOMTableView::onFilterChanged()
+void ctkDICOMTableView::setFilterText(const QString& filterText)
+{
+  Q_D(ctkDICOMTableView);
+  d->leSearchBox->setText(filterText);
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMTableView::onFilterChanged(const QString& filterText)
 {
   Q_D(ctkDICOMTableView);
 
+  d->dicomSQLFilterModel->setFilterWildcard(filterText);
+
   const QStringList uids = this->uidsForAllRows();
 
-  d->showFilterActiveWarning( d->dicomSQLFilterModel->rowCount() == 0 &&
-                              d->dicomSQLModel.rowCount() != 0);
+  bool showWarning = d->dicomSQLFilterModel->rowCount() == 0 &&
+    d->dicomSQLModel.rowCount() != 0;
+  d->showFilterActiveWarning(showWarning);
+  emit showFilterActiveWarning(showWarning);
 
   d->tblDicomDatabaseView->clearSelection();
   emit queryChanged(uids);
+  emit filterTextChanged(filterText);
 }
 
 //------------------------------------------------------------------------------
@@ -643,4 +654,18 @@ bool ctkDICOMTableView::setBatchUpdate(bool enable)
   d->batchUpdateModificationPending = false;
   d->batchUpdateInstanceAddedPending = false;
   return !d->batchUpdate;
+}
+
+//------------------------------------------------------------------------------
+bool ctkDICOMTableView::isHeaderVisible()const
+{
+  Q_D(const ctkDICOMTableView);
+  return d->headerWidget->isVisible();
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMTableView::setHeaderVisible(bool visible)
+{
+  Q_D(ctkDICOMTableView);
+  return d->headerWidget->setVisible(visible);
 }

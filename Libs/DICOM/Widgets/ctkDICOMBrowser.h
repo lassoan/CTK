@@ -47,12 +47,13 @@ class QModelIndex;
 ///
 /// Supported operations are:
 ///
-/// * Import
+/// * Import from file system
 /// * Export
-/// * Send
 /// * Query
-/// * Remove
+/// * Send (emits signal only, requires external implementation)
 /// * Repair
+/// * Remove
+/// * Metadata
 ///
 class CTK_DICOM_WIDGETS_EXPORT ctkDICOMBrowser : public QWidget
 {
@@ -70,6 +71,7 @@ class CTK_DICOM_WIDGETS_EXPORT ctkDICOMBrowser : public QWidget
   Q_PROPERTY(bool confirmRemove READ confirmRemove WRITE setConfirmRemove)
   Q_PROPERTY(bool toolbarVisible READ isToolbarVisible WRITE setToolbarVisible)
   Q_PROPERTY(bool databaseDirectorySelectorVisible READ isDatabaseDirectorySelectorVisible WRITE setDatabaseDirectorySelectorVisible)
+  Q_PROPERTY(bool sendActionVisible READ isSendActionVisible WRITE setSendActionVisible)
 
 public:
   typedef ctkDICOMBrowser Self;
@@ -133,9 +135,11 @@ public:
   void setToolbarVisible(bool state);
   bool isToolbarVisible() const;
 
-  void setDatabaseDirectorySelectorVisible(bool state);
+  void setDatabaseDirectorySelectorVisible(bool visible);
   bool isDatabaseDirectorySelectorVisible() const;
-  
+
+  void setSendActionVisible(bool visible);
+  bool isSendActionVisible() const;
 
 public Q_SLOTS:
 
@@ -160,6 +164,7 @@ public Q_SLOTS:
   void openImportDialog();
 
   void openExportDialog();
+  void openSendDialog();
   void openQueryDialog();
   void onRemoveAction();
   void onRepairAction();
@@ -208,6 +213,8 @@ public Q_SLOTS:
   /// Show window that displays DICOM fields of all selected items
   void showMetadata(const QStringList& fileList);
 
+  void removeSelectedItems(ctkDICOMModel::IndexType level);
+
 Q_SIGNALS:
   /// Emitted when directory is changed
   void databaseDirectoryChanged(const QString&);
@@ -215,6 +222,8 @@ Q_SIGNALS:
   void queryRetrieveFinished();
   /// Emitted when the directory import operation has completed
   void directoryImported();
+  /// Emitted when user requested network send. String list contains list of files to be exported.
+  void sendRequested(const QStringList&);
 
 protected:
     QScopedPointer<ctkDICOMBrowserPrivate> d_ptr;
@@ -251,13 +260,11 @@ protected Q_SLOTS:
 
     /// Called to export the series associated with the selected UIDs
     /// \sa exportSelectedStudies, exportSelectedPatients
-    void exportSelectedSeries(QString dirPath, QStringList uids);
+    void exportSeries(QString dirPath, QStringList uids);
+
     /// Called to export the studies associated with the selected UIDs
     /// \sa exportSelectedSeries, exportSelectedPatients
-    void exportSelectedStudies(QString dirPath, QStringList uids);
-    /// Called to export the patients associated with the selected UIDs
-    /// \sa exportSelectedStudies, exportSelectedSeries
-    void exportSelectedPatients(QString dirPath, QStringList uids);
+    void exportSelectedItems(ctkDICOMModel::IndexType level);
 
     /// To be called when dialog finishes
     void onQueryRetrieveFinished();

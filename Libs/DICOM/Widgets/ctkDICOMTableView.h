@@ -45,6 +45,7 @@ class CTK_DICOM_WIDGETS_EXPORT ctkDICOMTableView : public QWidget
   Q_OBJECT
   Q_PROPERTY(bool filterActive READ filterActive)
   Q_PROPERTY( QTableView* tblDicomDatabaseView READ tableView )
+  Q_PROPERTY(bool headerVisible READ isHeaderVisible WRITE setHeaderVisible)
 
 public:
   typedef QWidget Superclass;
@@ -137,6 +138,13 @@ public:
   */
   bool setBatchUpdate(bool);
 
+  /**
+  * @brief Show/hide table header
+  * Table header shows table name and search box.
+  */
+  void setHeaderVisible(bool state);
+  bool isHeaderVisible() const;
+
 public Q_SLOTS:
   /**
    * @brief slot is called if the selection of the tableview is changed
@@ -172,6 +180,11 @@ public Q_SLOTS:
    */
   void clearSelection();
 
+  /**
+  * @brief Set text in the filter box.
+  */
+  void setFilterText(const QString& filterText);
+
 protected Q_SLOTS:
   /**
   * @brief Called when the database is opened
@@ -196,7 +209,7 @@ protected Q_SLOTS:
   /**
    * @brief Called when the text of the ctkSearchBox has changed
    */
-  void onFilterChanged();
+  void onFilterChanged(const QString& filterText);
 
   /**
    * @brief Called if a new instance was added to the database
@@ -217,6 +230,18 @@ Q_SIGNALS:
    * @brief Is emitted when the data selection has changed
    */
   void selectionChanged(const QItemSelection&,const QItemSelection&);
+
+  /**
+   * @brief Is emitted when filter text is changed.
+   */
+  void filterTextChanged(const QString& filterText);
+
+  /**
+   * @brief Is emitted when filter active warning should be shown or hidden.
+   * Filter warning is displayed when no item is shown in the view because of
+   * the entered filter criteria.
+   */
+  void showFilterActiveWarning(bool showWarning);
 
   /**
    * @brief Is emitted when the query text has changed
