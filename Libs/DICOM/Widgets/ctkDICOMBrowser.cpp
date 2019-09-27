@@ -138,12 +138,10 @@ public:
 
   QSharedPointer<ctkDICOMDatabase> DICOMDatabase;
   QSharedPointer<ctkDICOMIndexer> DICOMIndexer;
-  QProgressDialog *IndexerProgress;
   QProgressDialog *UpdateSchemaProgress;
   QProgressDialog *UpdateDisplayedFieldsProgress;
   QProgressDialog *ExportProgress;
 
-  void showIndexerDialog();
   void showUpdateSchemaDialog();
 
   // used when suspending the ctkDICOMModel
@@ -167,38 +165,11 @@ public:
   // Default database path to use if there is nothing in settings
   QString DefaultDatabaseDirectory;
   QString DatabaseDirectory;
+
+  bool BatchUpdateBeforeIndexingUpdate;
 };
 
 CTK_GET_CPP(ctkDICOMBrowser, bool, isSendActionVisible, SendActionVisible);
-
-//----------------------------------------------------------------------------
-class ctkDICOMImportStats
-{
-public:
-  ctkDICOMImportStats(ctkDICOMBrowserPrivate* dicomBrowserPrivate) :
-    DICOMBrowserPrivate(dicomBrowserPrivate)
-  {
-    // reset counts
-    ctkDICOMBrowserPrivate* d = this->DICOMBrowserPrivate;
-    d->PatientsAddedDuringImport = 0;
-    d->StudiesAddedDuringImport = 0;
-    d->SeriesAddedDuringImport = 0;
-    d->InstancesAddedDuringImport = 0;
-  }
-
-  QString summary()
-  {
-    ctkDICOMBrowserPrivate* d = this->DICOMBrowserPrivate;
-    QString message = QString("Import completed: added %1 patients, %2 studies, %3 series, %4 instances.")
-      .arg(QString::number(d->PatientsAddedDuringImport))
-      .arg(QString::number(d->StudiesAddedDuringImport))
-      .arg(QString::number(d->SeriesAddedDuringImport))
-      .arg(QString::number(d->InstancesAddedDuringImport));
-    return message;
-  }
-
-  ctkDICOMBrowserPrivate* DICOMBrowserPrivate;
-};
 
 //----------------------------------------------------------------------------
 // ctkDICOMBrowserPrivate methods
@@ -211,8 +182,7 @@ ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   , QueryRetrieveWidget(0)
   , DICOMDatabase( QSharedPointer<ctkDICOMDatabase>(new ctkDICOMDatabase) )
   , DICOMIndexer( QSharedPointer<ctkDICOMIndexer>(new ctkDICOMIndexer) )
-  , IndexerProgress(0)
-  , UpdateSchemaProgress(0)
+    , UpdateSchemaProgress(0)
   , UpdateDisplayedFieldsProgress(0)
   , ExportProgress(0)
   , DisplayImportSummary(true)
@@ -224,16 +194,13 @@ ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   , InstancesAddedDuringImport(0)
   , DefaultDatabaseDirectory("./ctkDICOM-Database")
   , SendActionVisible(false)
+  , BatchUpdateBeforeIndexingUpdate(false)
 {
 }
 
 //----------------------------------------------------------------------------
 ctkDICOMBrowserPrivate::~ctkDICOMBrowserPrivate()
 {
-  if ( IndexerProgress )
-  {
-    delete IndexerProgress;
-  }
   if ( UpdateSchemaProgress )
   {
     delete UpdateSchemaProgress;
@@ -278,44 +245,6 @@ void ctkDICOMBrowserPrivate::showUpdateSchemaDialog()
 }
 
 //----------------------------------------------------------------------------
-void ctkDICOMBrowserPrivate::showIndexerDialog()
-{
-  Q_Q(ctkDICOMBrowser);
-  if (IndexerProgress == 0)
-  {
-    //
-    // Set up the Indexer Progress Dialog
-    //
-    IndexerProgress = new QProgressDialog( q->tr("DICOM Import"), "Cancel", 0, 100, q,
-         Qt::WindowTitleHint | Qt::WindowSystemMenuHint);
-
-    // We don't want the progress dialog to resize itself, so we bypass the label
-    // by creating our own
-    QLabel* progressLabel = new QLabel(q->tr("Initialization..."));
-    IndexerProgress->setLabel(progressLabel);
-    IndexerProgress->setWindowModality(Qt::ApplicationModal);
-    IndexerProgress->setMinimumDuration(0);
-    IndexerProgress->setValue(0);
-
-    q->connect(IndexerProgress, SIGNAL(canceled()), DICOMIndexer.data(), SLOT(cancel()));
-
-    q->connect(DICOMIndexer.data(), SIGNAL(progress(int)), IndexerProgress, SLOT(setValue(int)));
-    q->connect(DICOMIndexer.data(), SIGNAL(indexingFilePath(QString)), progressLabel, SLOT(setText(QString)));
-    q->connect(DICOMIndexer.data(), SIGNAL(indexingFilePath(QString)), q, SLOT(onFileIndexed(QString)));
-
-    // close the dialog
-    q->connect(DICOMIndexer.data(), SIGNAL(indexingComplete()), IndexerProgress, SLOT(close()));
-    // stop indexing and reset the database if canceled
-    q->connect(IndexerProgress, SIGNAL(canceled()), DICOMIndexer.data(), SLOT(cancel()));
-
-    // allow users of this widget to know that the process has finished
-    q->connect(IndexerProgress, SIGNAL(canceled()), q, SIGNAL(directoryImported()));
-    q->connect(DICOMIndexer.data(), SIGNAL(indexingComplete()), q, SIGNAL(directoryImported()));
-  }
-  IndexerProgress->show();
-}
-
-//----------------------------------------------------------------------------
 void ctkDICOMBrowserPrivate::init()
 {
   Q_Q(ctkDICOMBrowser);
@@ -326,6 +255,14 @@ void ctkDICOMBrowserPrivate::init()
 
   this->DatabaseDirectoryProblemFrame->hide();
   this->InformationMessageFrame->hide();
+  this->ProgressFrame->hide();
+
+  q->connect(this->ProgressCancelButton, SIGNAL(clicked()), DICOMIndexer.data(), SLOT(cancel()));
+  q->connect(DICOMIndexer.data(), SIGNAL(progress(int)), q, SLOT(onIndexingProgress(int)));
+  q->connect(DICOMIndexer.data(), SIGNAL(progressStep(QString)), q, SLOT(onIndexingProgressStep(QString)));
+  q->connect(DICOMIndexer.data(), SIGNAL(progressDetail(QString)), q, SLOT(onIndexingProgressDetail(QString)));
+  q->connect(DICOMIndexer.data(), SIGNAL(indexingComplete(int,int,int,int)), q, SLOT(onIndexingComplete(int,int,int,int)));
+  q->connect(DICOMIndexer.data(), SIGNAL(updatingDatabase(bool)), q, SLOT(onIndexingUpdatingDatabase(bool)));
 
   // Signals related to tracking inserts
   q->connect(this->DICOMDatabase.data(), SIGNAL(patientAdded(int,QString,QString,QString)), q, SLOT(onPatientAdded(int,QString,QString,QString)));
@@ -772,12 +709,6 @@ ctkDICOMTableManager* ctkDICOMBrowser::dicomTableManager()
 }
 
 //----------------------------------------------------------------------------
-void ctkDICOMBrowser::onFileIndexed(const QString& filePath)
-{
-  Q_UNUSED(filePath);
-}
-
-//----------------------------------------------------------------------------
 void ctkDICOMBrowser::openImportDialog()
 {
   Q_D(ctkDICOMBrowser);
@@ -958,28 +889,14 @@ void ctkDICOMBrowser::onImportDirectoryComboBoxCurrentIndexChanged(int index)
 void ctkDICOMBrowser::importDirectories(QStringList directories, ctkDICOMBrowser::ImportDirectoryMode mode)
 {
   Q_D(ctkDICOMBrowser);
-  ctkDICOMImportStats stats(d);
-
   if (!d->DICOMDatabase || !d->DICOMIndexer)
   {
     qWarning() << Q_FUNC_INFO << " failed: database or indexer is invalid";
     return;
   }
-
-  // Only emit one indexingComplete event, when all imports have been completed
-  ctkDICOMIndexer::ScopedIndexing indexingBatch(*d->DICOMIndexer, *d->DICOMDatabase);
-
-  bool wasBatchUpdate = d->dicomTableManager->setBatchUpdate(true);
   foreach (const QString& directory, directories)
   {
     d->importDirectory(directory, mode);
-  }
-  d->dicomTableManager->setBatchUpdate(wasBatchUpdate);
-
-  if (d->DisplayImportSummary)
-  {
-    d->InformationMessageLabel->setText(stats.summary());
-    d->InformationMessageFrame->show();
   }
 }
 
@@ -987,13 +904,7 @@ void ctkDICOMBrowser::importDirectories(QStringList directories, ctkDICOMBrowser
 void ctkDICOMBrowser::importDirectory(QString directory, ctkDICOMBrowser::ImportDirectoryMode mode)
 {
   Q_D(ctkDICOMBrowser);
-  ctkDICOMImportStats stats(d);
   d->importDirectory(directory, mode);
-  if (d->DisplayImportSummary)
-  {
-    d->InformationMessageLabel->setText(stats.summary());
-    d->InformationMessageFrame->show();
-  }
 }
 
 //----------------------------------------------------------------------------
@@ -1017,7 +928,6 @@ void ctkDICOMBrowserPrivate::importDirectory(QString directory, ctkDICOMBrowser:
   }
 
   // show progress dialog and perform indexing
-  this->showIndexerDialog();
   this->DICOMIndexer->addDirectory(*this->DICOMDatabase, directory, targetDirectory);
 }
 
@@ -1714,4 +1624,71 @@ void ctkDICOMBrowser::removeSelectedItems(ctkDICOMModel::IndexType level)
   }
   // Update the table views
   d->dicomTableManager->updateTableViews();
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::onIndexingProgress(int percent)
+{
+  Q_D(const ctkDICOMBrowser);
+  d->ProgressFrame->show();
+  d->ProgressBar->setValue(percent);
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::onIndexingProgressStep(const QString& step)
+{
+  Q_D(const ctkDICOMBrowser);
+  d->ProgressLabel->setText(step);
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::onIndexingProgressDetail(const QString& detail)
+{
+  Q_D(const ctkDICOMBrowser);
+  if (detail.isEmpty())
+  {
+    d->ProgressDetailLineEdit->hide();
+  }
+  else
+  {
+    d->ProgressDetailLineEdit->setText(detail);
+    d->ProgressDetailLineEdit->show();
+  }
+}
+
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::onIndexingUpdatingDatabase(bool updating)
+{
+  Q_D(ctkDICOMBrowser);
+  if (updating)
+  {
+    d->BatchUpdateBeforeIndexingUpdate = d->dicomTableManager->setBatchUpdate(true);
+  }
+  else
+  {
+    d->dicomTableManager->setBatchUpdate(d->BatchUpdateBeforeIndexingUpdate);
+  }
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::onIndexingComplete(int patientsAdded, int studiesAdded, int seriesAdded, int imagesAdded)
+{
+  Q_D(const ctkDICOMBrowser);
+  d->ProgressFrame->hide();
+  d->ProgressDetailLineEdit->hide();
+
+  if (d->DisplayImportSummary)
+  {
+    QString message = QString("Import completed: added %1 patients, %2 studies, %3 series, %4 instances.")
+      .arg(QString::number(patientsAdded))
+      .arg(QString::number(studiesAdded))
+      .arg(QString::number(seriesAdded))
+      .arg(QString::number(imagesAdded));
+    d->InformationMessageLabel->setText(message);
+    d->InformationMessageFrame->show();
+  }
+
+  // allow users of this widget to know that the process has finished
+  emit directoryImported();
 }

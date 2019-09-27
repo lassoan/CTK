@@ -137,6 +137,8 @@ public:
   /// \param displayedFieldsVectorPatient (Internal_ID -> (DisplayField -> Value) )
   void setNumberOfStudiesToPatientDisplayedFields(QVector<QMap<QString, QString> > &displayedFieldsVectorPatient);
 
+  int rowCount(const QString& tableName);
+
   /// Name of the database file (i.e. for SQLITE the sqlite file)
   QString DatabaseFileName;
   QString LastError;
@@ -168,7 +170,7 @@ public:
   QString TagCacheDatabaseFilename;
   QStringList TagsToPrecache;
   bool openTagCacheDatabase();
-  void precacheTags( const QString sopInstanceUID );
+  void precacheTags(const ctkDICOMItem& ctkDataset, const QString sopInstanceUID);
 
   int insertPatient(const ctkDICOMItem& ctkDataset);
   void insertStudy(const ctkDICOMItem& ctkDataset, int dbPatientID);
@@ -224,6 +226,25 @@ void ctkDICOMDatabasePrivate::registerCompressionLibraries(){
 ctkDICOMDatabasePrivate::~ctkDICOMDatabasePrivate()
 {
 }
+
+//------------------------------------------------------------------------------
+int ctkDICOMDatabasePrivate::rowCount(const QString& tableName)
+{
+  QSqlQuery numberOfItemsQuery(this->Database);
+  numberOfItemsQuery.prepare(QString("SELECT COUNT(*) FROM %1;").arg(tableName));
+  int numberOfItems = 0;
+  if (numberOfItemsQuery.exec())
+  {
+    numberOfItemsQuery.first();
+    numberOfItems = numberOfItemsQuery.value(0).toInt();
+  }
+  else
+  {
+    logger.error("SQLITE ERROR: " + numberOfItemsQuery.lastError().driverText());
+  }
+  return numberOfItems;
+}
+
 
 //------------------------------------------------------------------------------
 bool ctkDICOMDatabasePrivate::loggedExec(QSqlQuery& query)
@@ -567,18 +588,20 @@ bool ctkDICOMDatabasePrivate::openTagCacheDatabase()
   pragmaSyncQuery.exec("PRAGMA synchronous = OFF");
   pragmaSyncQuery.finish();
 
+  //this work on my pc too
+  this->TagCacheDatabase.exec("PRAGMA journal_mode = MEMORY");
+  if (this->TagCacheDatabase.lastError().isValid())
+  {
+    qDebug() << "journal_mode = MEMORY : " << this->TagCacheDatabase.lastError();
+  }
+
   return true;
 }
 
 //------------------------------------------------------------------------------
-void ctkDICOMDatabasePrivate::precacheTags( const QString sopInstanceUID )
+void ctkDICOMDatabasePrivate::precacheTags(const ctkDICOMItem& dataset, const QString sopInstanceUID)
 {
   Q_Q(ctkDICOMDatabase);
-
-  ctkDICOMItem dataset;
-  QString fileName = q->fileForInstance(sopInstanceUID);
-  dataset.InitializeFromFile(fileName);
-
 
   QStringList sopInstanceUIDs, tags, values;
   foreach (const QString &tag, this->TagsToPrecache)
@@ -814,7 +837,7 @@ void ctkDICOMDatabasePrivate::insert(const ctkDICOMItem& ctkDataset, const QStri
         insertImageStatement.exec();
 
         // insert was needed, so cache any application-requested tags
-        this->precacheTags(sopInstanceUID);
+        this->precacheTags(ctkDataset, sopInstanceUID);
 
         // let users of this class track when things happen
         emit q->instanceAdded(sopInstanceUID);
@@ -851,6 +874,323 @@ void ctkDICOMDatabasePrivate::insert(const ctkDICOMItem& ctkDataset, const QStri
     qDebug() << "No patient name or no patient id - not inserting!";
   }
 }
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& indexingResults)
+{
+  Q_D(ctkDICOMDatabase);
+
+  // Map from DICOM to database ID
+  QMap<QString, int> insertedPatients;
+  QSet<QString> insertedStudies;
+  QSet<QString> insertedSeries;
+
+  bool databaseWasChanged = false;
+
+  {
+    QSqlQuery transaction(d->TagCacheDatabase);
+    transaction.prepare("BEGIN TRANSACTION");
+    transaction.exec();
+  }
+
+  QStringList sopInstanceUIDs, tags, values;
+
+
+  //bool inTransaction = true;
+  d->beginTransaction();
+
+  foreach(const ctkDICOMDatabase::IndexingResult & indexingResult, indexingResults)
+  {
+    const ctkDICOMItem& ctkDataset = *indexingResult.dataset.data();
+    QString filePath = indexingResult.filePath;
+    bool generateThumbnail = false;
+    bool storeFile = indexingResult.storeFile;
+    //this->BackgroundIndexingDatabase->insert(indexingResult.filePath, *indexingResult.dataset.data(), indexingResult.storeFile, false);
+
+    // this is the method that all other insert signatures end up calling
+    // after they have pre-parsed their arguments
+
+    // Check to see if the file has already been loaded
+    // TODO:
+    // It could make sense to actually remove the dataset and re-add it. This needs the remove
+    // method we still have to write.
+
+    QString sopInstanceUID(ctkDataset.GetElementAsString(DCM_SOPInstanceUID));
+    /*
+    delete all pre-existing images and precache tags for series that we will overwrite
+    QSqlQuery fileExistsQuery(d->Database);
+    fileExistsQuery.prepare("SELECT InsertTimestamp,Filename FROM Images WHERE SOPInstanceUID == :sopInstanceUID");
+    fileExistsQuery.bindValue(":sopInstanceUID", sopInstanceUID);
+    {
+      bool success = fileExistsQuery.exec();
+      if (!success)
+      {
+        logger.error("SQLITE ERROR: " + fileExistsQuery.lastError().driverText());
+        return;
+      }
+      bool found = fileExistsQuery.next();
+      if (this->LoggedExecVerbose)
+      {
+        qDebug() << "inserting filePath: " << filePath;
+      }
+      if (!found)
+      {
+        if (this->LoggedExecVerbose)
+        {
+          qDebug() << "database filename for " << sopInstanceUID << " is empty - we should insert on top of it";
+        }
+      }
+      else
+      {
+        QString databaseFilename(fileExistsQuery.value(1).toString());
+        QDateTime fileLastModified(QFileInfo(databaseFilename).lastModified());
+        QDateTime databaseInsertTimestamp(QDateTime::fromString(fileExistsQuery.value(0).toString(), Qt::ISODate));
+
+        // Compare QFileInfo objects instead of path strings to ensure equivalent file names
+        // (such as same file name in uppercase/lowercase on Windows) are considered as equal.
+        if (QFileInfo(databaseFilename) == QFileInfo(filePath) && fileLastModified < databaseInsertTimestamp)
+        {
+          logger.debug("File " + databaseFilename + " already added");
+          return;
+        }
+        else
+        {
+          QSqlQuery deleteFile(d->Database);
+          deleteFile.prepare("DELETE FROM Images WHERE SOPInstanceUID == :sopInstanceUID");
+          deleteFile.bindValue(":sopInstanceUID", sopInstanceUID);
+          bool success = deleteFile.exec();
+          if (!success)
+          {
+            logger.error("SQLITE ERROR deleting old image row: " + deleteFile.lastError().driverText());
+            return;
+          }
+        }
+      }
+    }
+*/
+//If the following fields can not be evaluated, cancel evaluation of the DICOM file
+    QString patientsName(ctkDataset.GetElementAsString(DCM_PatientName));
+    QString studyInstanceUID(ctkDataset.GetElementAsString(DCM_StudyInstanceUID));
+    QString seriesInstanceUID(ctkDataset.GetElementAsString(DCM_SeriesInstanceUID));
+    QString patientID(ctkDataset.GetElementAsString(DCM_PatientID));
+    if (patientID.isEmpty() && !studyInstanceUID.isEmpty())
+    { // Use study instance uid as patient id if patient id is empty - can happen on anonymized datasets
+      // see: http://www.na-mic.org/Bug/view.php?id=2040
+      logger.warn("Patient ID is empty, using studyInstanceUID as patient ID");
+      patientID = studyInstanceUID;
+    }
+    if (patientsName.isEmpty() && !patientID.isEmpty())
+    { // Use patient id as name if name is empty - can happen on anonymized datasets
+      // see: http://www.na-mic.org/Bug/view.php?id=1643
+      patientsName = patientID;
+    }
+    if (patientsName.isEmpty() || studyInstanceUID.isEmpty() || patientID.isEmpty())
+    {
+      logger.error("Dataset is missing necessary information (patient name, study instance UID, or patient ID)!");
+      continue;
+    }
+
+    // store the file if the database is not in memory
+    // TODO: if we are called from insert(file) we
+    // have to do something else
+    //
+    QString filename = filePath;
+    if (storeFile && !this->isInMemory() && !seriesInstanceUID.isEmpty())
+    {
+      // QString studySeriesDirectory = studyInstanceUID + "/" + seriesInstanceUID;
+      QString destinationDirectoryName = this->databaseDirectory() + "/dicom/";
+      QDir destinationDir(destinationDirectoryName);
+      filename = destinationDirectoryName +
+        studyInstanceUID + "/" +
+        seriesInstanceUID + "/" +
+        sopInstanceUID;
+
+      destinationDir.mkpath(studyInstanceUID + "/" +
+        seriesInstanceUID);
+
+      if (filePath.isEmpty())
+      {
+        if (d->LoggedExecVerbose)
+        {
+          logger.debug("Saving file: " + filename);
+        }
+
+        if (!ctkDataset.SaveToFile(filename))
+        {
+          logger.error("Error saving file: " + filename);
+          return;
+        }
+      }
+      else
+      {
+        // we're inserting an existing file
+        QFile currentFile(filePath);
+        currentFile.copy(filename);
+        if (d->LoggedExecVerbose)
+        {
+          logger.debug("Copy file from: " + filePath + " to: " + filename);
+        }
+      }
+    }
+
+    if (patientID.isEmpty() || patientsName.isEmpty())
+    {
+      qDebug() << "No patient name or no patient id - not inserting!";
+      continue;
+    }
+
+    //Speed up: Check if patient is the same as in last file;
+    // very probable, as all images belonging to a study have the same patient
+    QString patientsBirthDate(ctkDataset.GetElementAsString(DCM_PatientBirthDate));
+    QString compositePatientId = QString("%1~%2~%3").arg(patientID).arg(patientsBirthDate).arg(patientsName);
+    //The dbPatientID  is a unique number within the database,
+    //generated by the sqlite autoincrement
+    //The patientID  is the (non-unique) DICOM patient id
+    QMap<QString, int>::iterator dbPatientIDit = insertedPatients.find(compositePatientId);
+    int dbPatientID = -1;
+    if (dbPatientIDit != insertedPatients.end())
+    {
+      // already in database
+      int dbPatientID = *dbPatientIDit;
+    }
+    else
+    {
+      if (d->LoggedExecVerbose)
+      {
+        qDebug() << "This looks like a different patient from last insert: " << patientID;
+      }
+      // Ok, something is different from last insert, let's insert him if he's not
+      // already in the db.
+
+      dbPatientID = d->insertPatient(ctkDataset);
+      databaseWasChanged = true;
+
+      insertedPatients[compositePatientId] = dbPatientID;
+
+      // let users of this class track when things happen
+      emit patientAdded(dbPatientID, patientID, patientsName, patientsBirthDate);
+    }
+    if (d->LoggedExecVerbose)
+    {
+      qDebug() << "Going to insert this instance with dbPatientID: " << dbPatientID;
+    }
+
+    // Patient is in now. Let's continue with the study
+    if (!insertedStudies.contains(studyInstanceUID))
+    {
+      d->insertStudy(ctkDataset, dbPatientID);
+      insertedStudies.insert(studyInstanceUID);
+      databaseWasChanged = true;
+      // let users of this class track when things happen
+      emit studyAdded(studyInstanceUID);
+      qDebug() << "Study Added";
+    }
+
+    if (!seriesInstanceUID.isEmpty() && !insertedSeries.contains(seriesInstanceUID))
+    {
+      d->insertSeries(ctkDataset, studyInstanceUID);
+      insertedSeries.insert(seriesInstanceUID);
+      databaseWasChanged = true;
+
+      // let users of this class track when things happen
+      emit seriesAdded(seriesInstanceUID);
+      qDebug() << "Series Added";
+    }
+
+    if (seriesInstanceUID.isEmpty() || filename.isEmpty())
+    {
+      continue;
+    }
+
+    // TODO: what to do with imported files
+    //
+    {
+      QSqlQuery insertImageStatement(d->Database);
+      insertImageStatement.prepare("INSERT INTO Images ( 'SOPInstanceUID', 'Filename', 'SeriesInstanceUID', 'InsertTimestamp' ) VALUES ( ?, ?, ?, ? )");
+      insertImageStatement.addBindValue(sopInstanceUID);
+      insertImageStatement.addBindValue(filename);
+      insertImageStatement.addBindValue(seriesInstanceUID);
+      insertImageStatement.addBindValue(QDateTime::currentDateTime());
+      insertImageStatement.exec();
+
+      // insert was needed, so cache any application-requested tags
+      {
+
+        
+        QSqlQuery insertTags(d->TagCacheDatabase);
+        //insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
+        insertTags.prepare("INSERT INTO TagCache VALUES(?,?,?)");
+        insertTags.bindValue(0, sopInstanceUID);
+
+        foreach(const QString& tag, d->TagsToPrecache)
+        {
+          unsigned short group, element;
+          this->tagToGroupElement(tag, group, element);
+          DcmTagKey tagKey(group, element);
+          QString value = ctkDataset.GetAllElementValuesAsString(tagKey);
+          insertTags.bindValue(1, tag);
+          if (value.isEmpty())
+          {
+            insertTags.bindValue(2, TagNotInInstance);
+          }
+          else
+          {
+            insertTags.bindValue(2, value);
+          }
+          insertTags.exec();
+        }
+
+        //qDebug() << "end transaction:" << QSqlDatabase::database().commit();
+
+      }
+
+
+      // let users of this class track when things happen
+      emit instanceAdded(sopInstanceUID);
+      if (d->LoggedExecVerbose)
+      {
+        qDebug() << "Instance Added";
+      }
+      databaseWasChanged = true;
+    }
+
+    if (generateThumbnail && d->ThumbnailGenerator)
+    {
+      QString studySeriesDirectory = studyInstanceUID + "/" + seriesInstanceUID;
+      //Create thumbnail here
+      QString thumbnailPath = this->databaseDirectory() +
+        "/thumbs/" + studyInstanceUID + "/" + seriesInstanceUID
+        + "/" + sopInstanceUID + ".png";
+      QFileInfo thumbnailInfo(thumbnailPath);
+      if (!(thumbnailInfo.exists() && (thumbnailInfo.lastModified() > QFileInfo(filename).lastModified())))
+      {
+        QDir(this->databaseDirectory() + "/thumbs/").mkpath(studySeriesDirectory);
+        DicomImage dcmImage(QDir::toNativeSeparators(filename).toLatin1());
+        d->ThumbnailGenerator->generateThumbnail(&dcmImage, thumbnailPath);
+        databaseWasChanged = true;
+      }
+    }
+  }
+
+  //this->cacheTags(sopInstanceUIDs, tags, values);
+
+
+
+
+  {
+    QSqlQuery transaction = QSqlQuery(d->TagCacheDatabase);
+    transaction.prepare("END TRANSACTION");
+    transaction.exec();
+  }
+
+  d->endTransaction();
+
+  if (databaseWasChanged && this->isInMemory())
+  {
+    emit this->databaseChanged();
+  }
+}
+
 
 //------------------------------------------------------------------------------
 int ctkDICOMDatabasePrivate::getDisplayPatientFieldsIndex(QString patientsName, QString patientID, QVector<QMap<QString, QString> > &displayedFieldsVectorPatient)
@@ -1217,7 +1557,6 @@ void ctkDICOMDatabasePrivate::setNumberOfStudiesToPatientDisplayedFields(QVector
   }
 }
 
-
 //------------------------------------------------------------------------------
 // ctkDICOMDatabase methods
 //------------------------------------------------------------------------------
@@ -1290,6 +1629,13 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
   QSqlQuery pragmaSyncQuery(d->Database);
   pragmaSyncQuery.exec("PRAGMA synchronous = OFF");
   pragmaSyncQuery.finish();
+
+  d->Database.exec("PRAGMA journal_mode = MEMORY");
+  if (d->Database.lastError().isValid())
+  {
+    qDebug() << "journal_mode = MEMORY : " << d->Database.lastError();
+  }
+
 
   // Set up the tag cache for use later
   QFileInfo fileInfo(d->DatabaseFileName);
@@ -1757,6 +2103,33 @@ QDateTime ctkDICOMDatabase::insertDateTimeForInstance(QString sopInstanceUID)
   return( result );
 }
 
+//------------------------------------------------------------------------------
+int ctkDICOMDatabase::patientsCount()
+{
+  Q_D(ctkDICOMDatabase);
+  return d->rowCount("Patients");
+}
+
+//------------------------------------------------------------------------------
+int ctkDICOMDatabase::studiesCount()
+{
+  Q_D(ctkDICOMDatabase);
+  return d->rowCount("Studies");
+}
+
+//------------------------------------------------------------------------------
+int ctkDICOMDatabase::seriesCount()
+{
+  Q_D(ctkDICOMDatabase);
+  return d->rowCount("Series");
+}
+
+//------------------------------------------------------------------------------
+int ctkDICOMDatabase::imagesCount()
+{
+  Q_D(ctkDICOMDatabase);
+  return d->rowCount("Images");
+}
 
 //
 // instance header methods
@@ -1990,6 +2363,14 @@ void ctkDICOMDatabase::insert( const ctkDICOMItem& ctkDataset, bool storeFile, b
 }
 
 //------------------------------------------------------------------------------
+void ctkDICOMDatabase::insert(const QString& filePath, const ctkDICOMItem& ctkDataset,
+  bool storeFile, bool generateThumbnail)
+{
+  Q_D(ctkDICOMDatabase);
+  d->insert(ctkDataset, filePath, storeFile, generateThumbnail);
+}
+
+//------------------------------------------------------------------------------
 void ctkDICOMDatabase::insert( const QString& filePath, bool storeFile, bool generateThumbnail, bool createHierarchy, const QString& destinationDirectoryName)
 {
   Q_D(ctkDICOMDatabase);
@@ -2054,6 +2435,26 @@ bool ctkDICOMDatabase::fileExistsAndUpToDate(const QString& filePath)
   return result;
 }
 
+//------------------------------------------------------------------------------
+bool ctkDICOMDatabase::allFilesModifiedTimes(QMap<QString, QDateTime>& modifiedTimeForFilepath)
+{
+  Q_D(ctkDICOMDatabase);
+  QSqlQuery allFilesModifiedQuery(database());
+  allFilesModifiedQuery.prepare("SELECT Filename, InsertTimestamp FROM Images;");
+  bool success = d->loggedExec(allFilesModifiedQuery);
+  while (allFilesModifiedQuery.next())
+  {
+    QString filename = allFilesModifiedQuery.value(0).toString();
+    QDateTime modifiedTime = QDateTime::fromString(allFilesModifiedQuery.value(1).toString(), Qt::ISODate);
+    if (modifiedTimeForFilepath.contains(filename) && modifiedTimeForFilepath[filename] <= modifiedTime)
+    {
+      continue;
+    }
+    modifiedTimeForFilepath[filename] = modifiedTime;
+  }
+  allFilesModifiedQuery.finish();
+  return success;
+}
 
 //------------------------------------------------------------------------------
 bool ctkDICOMDatabase::isOpen() const
@@ -2374,7 +2775,8 @@ bool ctkDICOMDatabase::cacheTags(const QStringList sopInstanceUIDs, const QStrin
   }
 
   QSqlQuery insertTags( d->TagCacheDatabase );
-  insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
+  //insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
+  insertTags.prepare("INSERT INTO TagCache VALUES(?,?,?)");
   insertTags.addBindValue(sopInstanceUIDs);
   insertTags.addBindValue(tags);
   insertTags.addBindValue(values);

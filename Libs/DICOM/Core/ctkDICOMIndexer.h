@@ -88,70 +88,24 @@ public:
   Q_INVOKABLE void addFile(ctkDICOMDatabase& database, const QString filePath,
                     const QString& destinationDirectoryName = "");
 
-  Q_INVOKABLE void refreshDatabase(ctkDICOMDatabase& database, const QString& directoryName);
-
   ///
-  /// \brief Deprecated - no op.
-  /// \deprecated
-  /// Previously ensured that the QFuture threads have all finished indexing
-  /// before returning control.
-  ///
-  Q_INVOKABLE void waitForImportFinished();
-
-  /// Call this before performing multiple add...() calls in one batch
-  /// to slightly increase indexing performance and to make only a single
-  /// indexingComplete() signal emitted for multiple add...() operations.
-  /// 
-  /// If startIndexing() is called before a batch of insertions, then
-  /// endIndexing() method must be called after the insertions are completed.
-  ///
-  /// It is recommended to use ScopedIndexing helper class to call startIndexing
-  /// and endIndexing automatically.
-  Q_INVOKABLE void startIndexing(ctkDICOMDatabase& database);
-
-  /// Call this method after batch insertion is completed, and only if startIndexing()
-  /// was called before batch insertion was started.
-  Q_INVOKABLE void endIndexing();
-
-  /// Helper class to automatically call startIndexing and endIndexing.
-  /// Its constructor calls startIndexing and its destructor calls endIndexing.
-  ///
-  /// Example:
-  ///   ...
-  ///   {
-  ///     ctkDICOMIndexer::ScopedIndexing indexingBatch(indexer, database); // this calls startIndexing
-  ///     indexer.addDirectory(database, dir1);
-  ///     indexer.addDirectory(database, dir2);
-  ///     indexer.addDirectory(database, dir3);
-  ///   } // endIndexing is called when indexingBatch goes out of scope
-  ///
-  class ScopedIndexing
-  {
-    public:
-    ScopedIndexing(ctkDICOMIndexer& indexer, ctkDICOMDatabase& database)
-    {
-      this->Indexer = &indexer;
-      this->Indexer->startIndexing(database);
-    }
-    ~ScopedIndexing()
-    {
-      this->Indexer->endIndexing();
-    }
-    private:
-    ctkDICOMIndexer* Indexer;
-  };
+  /// \brief Wait for all the indexing operations to complete
+  /// msecTimeout specifies a maximum timeout. If <0 then it means wait indefinitely.
+  Q_INVOKABLE void waitForImportFinished(int msecTimeout = -1);
 
 Q_SIGNALS:
-  void foundFilesToIndex(int);
-  void indexingFileNumber(int);
-  void indexingFilePath(QString);
+  /// Description of current phase of the indexing (parsing, importing, ...)
+  void progressStep(QString);
+  /// Detailed information about the current progress (e.g., name of currently processed file)
+  void progressDetail(QString);
+  /// Progress in percentage
   void progress(int);
-  void indexingComplete();
-
-  /// Trigger showing progress dialog for displayed fields update
-  void displayedFieldsUpdateStarted();
+  /// Indexing is completed.
+  void indexingComplete(int patientsAdded, int studiesAdded, int seriesAdded, int imagesAdded);
+  void updatingDatabase(bool);
 
 public Q_SLOTS:
+  /// Stop indexing (all completed indexing results will be added to the database)
   void cancel();
 
 protected:

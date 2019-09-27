@@ -61,6 +61,20 @@ class CTK_DICOM_CORE_EXPORT ctkDICOMDatabase : public QObject
   Q_PROPERTY(QStringList tagsToPrecache READ tagsToPrecache WRITE setTagsToPrecache)
 
 public:
+  struct IndexingResult
+  {
+    IndexingResult()
+    {
+    }
+    ~IndexingResult()
+    {
+    }
+    QString filePath;
+    QSharedPointer<ctkDICOMItem> dataset;
+    bool storeFile;
+    bool overwriteExistingDataset;
+  };
+
   explicit ctkDICOMDatabase(QObject *parent = 0);
   explicit ctkDICOMDatabase(QString databaseFile);
   virtual ~ctkDICOMDatabase();
@@ -159,7 +173,15 @@ public:
   Q_INVOKABLE QString instanceForFile (const QString fileName);
   Q_INVOKABLE QDateTime insertDateTimeForInstance (const QString fileName);
 
+  Q_INVOKABLE int patientsCount();
+  Q_INVOKABLE int studiesCount();
+  Q_INVOKABLE int seriesCount();
+  Q_INVOKABLE int imagesCount();
+
   Q_INVOKABLE QStringList allFiles ();
+
+  bool allFilesModifiedTimes(QMap<QString, QDateTime>& modifiedTimeForFilepath);
+
   /// \brief Load the header from a file and allow access to elements
   /// @param sopInstanceUID A string with the uid for a given instance
   ///                       (corresponding file will be found via database)
@@ -205,6 +227,11 @@ public:
                             bool storeFile = true, bool generateThumbnail = true,
                             bool createHierarchy = true,
                             const QString& destinationDirectoryName = QString() );
+
+  Q_INVOKABLE void insert(const QString& filePath, const ctkDICOMItem& ctkDataset,
+    bool storeFile = true, bool generateThumbnail = true);
+
+  Q_INVOKABLE void insert(const QList<ctkDICOMDatabase::IndexingResult>& indexingResults);
 
   /// Update the fields in the database that are used for displaying information
   /// from information stored in the tag-cache.

@@ -24,6 +24,146 @@
 #include <QObject>
 
 #include "ctkDICOMIndexer.h"
+#include "ctkDICOMItem.h"
+
+class ctkDICOMDatabase;
+class ctkDataset;
+
+class DICOMIndexingQueue
+{
+public:
+  struct IndexingRequest
+  {
+    /// Either inputFolderPath or inputFilesPath is used
+    QString inputFolderPath;
+    QStringList inputFilesPath;
+    bool includeHiddenFolders;
+    bool storeFile;
+  };
+
+  DICOMIndexingQueue()
+    : Mutex(QMutex::Recursive)
+    , IsIndexing(false)
+    , StopRequested(false)
+  {
+  }
+
+  virtual ~DICOMIndexingQueue()
+  {
+  }
+
+  int popIndexingRequest(IndexingRequest& indexingRequest)
+  {
+    QMutexLocker locker(&this->Mutex);
+    if (this->IndexingRequests.empty())
+    {
+      return -1;
+    }
+    indexingRequest = this->IndexingRequests.takeFirst();
+    return this->IndexingRequests.count();
+  }
+
+  void pushIndexingRequest(const IndexingRequest& indexingRequest)
+  {
+    QMutexLocker locker(&this->Mutex);
+    this->IndexingRequests.push_back(indexingRequest);
+  }
+
+  void popAllIndexingResults(QList<ctkDICOMDatabase::IndexingResult>& indexingResults)
+  {
+    QMutexLocker locker(&this->Mutex);
+    indexingResults = this->IndexingResults;
+    this->IndexingResults.clear();
+  }
+
+  void pushIndexingResult(const ctkDICOMDatabase::IndexingResult& indexingResult)
+  {
+    QMutexLocker locker(&this->Mutex);
+    this->IndexingResults.push_back(indexingResult);
+  }
+
+  void modifiedTimeForFilepath(QMap<QString, QDateTime>& timesForPaths)
+  {
+    QMutexLocker locker(&this->Mutex);
+    timesForPaths = this->ModifiedTimeForFilepath;
+  }
+
+  void setModifiedTimeForFilepath(const QMap<QString, QDateTime>& timesForPaths)
+  {
+    QMutexLocker locker(&this->Mutex);
+    this->ModifiedTimeForFilepath = timesForPaths;
+  }
+
+  bool setIndexing(bool indexing)
+  {
+    QMutexLocker locker(&this->Mutex);
+    bool wasIndexing = this->IsIndexing;
+    this->IsIndexing = indexing;
+    return wasIndexing;
+  }
+
+  bool isIndexing()
+  {
+    QMutexLocker locker(&this->Mutex);
+    return this->IsIndexing;
+  }
+
+  bool isStopRequested()
+  {
+    return this->StopRequested;
+  }
+
+  void setStopRequested(bool stop)
+  {
+    this->StopRequested = stop;
+  }
+
+protected:
+  // List of already indexed file paths and oldest file modified time in the database
+  QMap<QString, QDateTime> ModifiedTimeForFilepath;
+
+  QList<IndexingRequest> IndexingRequests;
+  QList<ctkDICOMDatabase::IndexingResult> IndexingResults;
+
+  bool IsIndexing;
+  bool StopRequested;
+
+  mutable QMutex Mutex;
+};
+
+
+class ctkDICOMIndexerPrivateWorker : public QObject
+{
+  Q_OBJECT
+
+public:
+  ctkDICOMIndexerPrivateWorker(DICOMIndexingQueue* queue);
+  virtual ~ctkDICOMIndexerPrivateWorker();
+
+public Q_SLOTS:
+  void start();
+
+Q_SIGNALS:
+  void foundFilesToIndex(int);
+  void indexingFileNumber(int);
+  void indexingFilePath(QString);
+  void progress(int);
+  void indexingComplete();
+
+private:
+
+  void processIndexingRequest(DICOMIndexingQueue::IndexingRequest& request);
+
+  DICOMIndexingQueue* RequestQueue;
+
+  int RemainingRequestCount; // the current request in progress is not included
+  int CompletedRequestCount; // the current request in progress is not included
+
+  // List of already indexed file paths and oldest file modified time in the database.
+  // Cached here to avoid locking/unlocking a mutex each time a file is looked up.
+  QMap<QString, QDateTime> ModifiedTimeForFilepath;
+};
+
 
 //------------------------------------------------------------------------------
 class ctkDICOMIndexerPrivate : public QObject
@@ -39,18 +179,18 @@ public:
   ctkDICOMIndexerPrivate(ctkDICOMIndexer&);
   ~ctkDICOMIndexerPrivate();
 
-public:
-  ctkDICOMAbstractThumbnailGenerator* thumbnailGenerator;
-  bool                    Canceled;
+  void pushIndexingRequest(ctkDICOMDatabase& database, const DICOMIndexingQueue::IndexingRequest& request);
 
-  // Incremented each time startIndexing is called
-  // and decremented when endIndexing is called.
-  // This makes sure that when a batch of indexing
-  // operations are performed, at any level
-  // (file, folder, or set of folders) then
-  // batch processing initialization and finalization
-  // are performed exactly once.
-  int                     StartedIndexing;
+Q_SIGNALS:
+  void startWorker();
+
+public Q_SLOTS:
+  void backgroundIndexingComplete();
+
+public:
+  DICOMIndexingQueue RequestQueue;
+  QThread WorkerThread;
+  ctkDICOMDatabase* BackgroundIndexingDatabase;
 };
 
 

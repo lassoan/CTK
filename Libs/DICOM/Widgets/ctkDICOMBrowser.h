@@ -152,7 +152,6 @@ public Q_SLOTS:
   void setImportDirectoryMode(ctkDICOMBrowser::ImportDirectoryMode mode);
 
   void setDatabaseDirectory(const QString& directory);
-  void onFileIndexed(const QString& filePath);
 
   /// \brief Pop-up file dialog allowing to select and import one or multiple
   /// DICOM directories.
@@ -194,6 +193,12 @@ public Q_SLOTS:
   void onStudyAdded(QString);
   void onSeriesAdded(QString);
   void onInstanceAdded(QString);
+  
+  void onIndexingProgress(int);
+  void onIndexingProgressStep(const QString&);
+  void onIndexingProgressDetail(const QString&);
+  void onIndexingUpdatingDatabase(bool updating);
+  void onIndexingComplete(int patientsAdded, int studiesAdded, int seriesAdded, int imagesAdded);
 
   /// Show pop-up window for the user to select database directory
   void selectDatabaseDirectory();

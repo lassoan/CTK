@@ -90,6 +90,7 @@ QStringList ctkDICOMDisplayedFieldGenerator::getRequiredTags()
   {
     requiredTags << rule->getRequiredDICOMTags();
   }
+  requiredTags.removeDuplicates();
 
   // TODO: remove duplicates from requiredTags (maybe also sort)
   return requiredTags;
