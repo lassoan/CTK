@@ -73,6 +73,7 @@ public:
     QSharedPointer<ctkDICOMItem> dataset;
     bool storeFile;
     bool overwriteExistingDataset;
+    QString databaseFolder;
   };
 
   explicit ctkDICOMDatabase(QObject *parent = 0);

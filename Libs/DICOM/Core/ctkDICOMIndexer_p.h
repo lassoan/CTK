@@ -39,6 +39,7 @@ public:
     QStringList inputFilesPath;
     bool includeHiddenFolders;
     bool storeFile;
+    QString databaseFolder;
   };
 
   DICOMIndexingQueue()
@@ -144,15 +145,16 @@ public Q_SLOTS:
   void start();
 
 Q_SIGNALS:
-  void foundFilesToIndex(int);
-  void indexingFileNumber(int);
-  void indexingFilePath(QString);
   void progress(int);
-  void indexingComplete();
+  void progressDetail(QString);
+  void progressStep(QString);
+  void updatingDatabase(bool);
+  void indexingComplete(int, int, int, int);
 
 private:
 
   void processIndexingRequest(DICOMIndexingQueue::IndexingRequest& request);
+  void writeIndexingResultsToDatabase();
 
   DICOMIndexingQueue* RequestQueue;
 
@@ -184,8 +186,7 @@ public:
 Q_SIGNALS:
   void startWorker();
 
-public Q_SLOTS:
-  void backgroundIndexingComplete();
+//public Q_SLOTS:
 
 public:
   DICOMIndexingQueue RequestQueue;

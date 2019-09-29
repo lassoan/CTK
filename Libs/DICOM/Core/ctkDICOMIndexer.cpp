@@ -93,7 +93,7 @@ void ctkDICOMIndexerPrivateWorker::start()
       // finished
       this->RequestQueue->setStopRequested(false);
       this->RequestQueue->setIndexing(false);
-      emit indexingComplete();
+      this->writeIndexingResultsToDatabase();
       return;
     }
     this->processIndexingRequest(indexingRequest);
@@ -128,7 +128,7 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
     int percent = int(100.0 * (this->CompletedRequestCount + double(currentFileIndex) / double(indexingRequest.inputFilesPath.size()))
       / double(this->CompletedRequestCount + this->RemainingRequestCount + 1));
     emit this->progress(percent);
-    emit indexingFilePath(filePath);
+    emit progressDetail(filePath);
 
     QDateTime fileModifiedTime = QFileInfo(filePath).lastModified();
     bool datasetAlreadyInDatabase = this->ModifiedTimeForFilepath.contains(filePath);
@@ -147,6 +147,7 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
       indexingResult.filePath = filePath;
       indexingResult.storeFile = indexingRequest.storeFile;
       indexingResult.overwriteExistingDataset = datasetAlreadyInDatabase;
+      indexingResult.databaseFolder = indexingRequest.databaseFolder;
       this->RequestQueue->pushIndexingResult(indexingResult);
     }
     else
@@ -169,6 +170,61 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
 
 
 //------------------------------------------------------------------------------
+void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
+{
+  QDir::Filters filters = QDir::Files;
+  QTime timeProbe;
+
+  timeProbe.start();
+  //emit q->progressDetail("");
+  //emit q->progressStep("Updating database");
+  QList<ctkDICOMDatabase::IndexingResult> indexingResults;
+  this->RequestQueue->popAllIndexingResults(indexingResults);
+
+  int patientsAdded = 0;
+  int studiesAdded = 0;
+  int seriesAdded = 0;
+  int imagesAdded = 0;
+
+
+  ctkDICOMDatabase DICOMDatabase;
+  if (!indexingResults.isEmpty())
+  {
+    // Activate batch update
+    emit updatingDatabase(true);
+
+    DICOMDatabase.openDatabase(indexingResults[0].databaseFolder);
+
+    int patientsCount = DICOMDatabase.patientsCount();
+    int studiesCount = DICOMDatabase.studiesCount();
+    int seriesCount = DICOMDatabase.seriesCount();
+    int imagesCount = DICOMDatabase.imagesCount();
+
+
+    DICOMDatabase.insert(indexingResults);
+
+    patientsAdded = DICOMDatabase.patientsCount() - patientsCount;
+    studiesAdded = DICOMDatabase.studiesCount() - studiesCount;
+    seriesAdded = DICOMDatabase.seriesCount() - seriesCount;
+    imagesAdded = DICOMDatabase.imagesCount() - imagesCount;
+
+    // Update displayed fields according to inserted DICOM datasets
+    emit progressDetail("");
+    emit progressStep("Updating database displayed fields");
+
+    DICOMDatabase.updateDisplayedFields();
+
+    float elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
+    qDebug() << QString("DICOM indexer has successfully inserted %1 files [%2s]")
+      .arg(indexingResults.count()).arg(QString::number(elapsedTimeInSeconds, 'f', 2));
+
+    emit updatingDatabase(false);
+  }
+
+  emit indexingComplete(patientsAdded, studiesAdded, seriesAdded, imagesAdded);
+}
+
+//------------------------------------------------------------------------------
 // ctkDICOMIndexerPrivate methods
 
 //------------------------------------------------------------------------------
@@ -183,9 +239,11 @@ ctkDICOMIndexerPrivate::ctkDICOMIndexerPrivate(ctkDICOMIndexer& o)
   connect(this, &ctkDICOMIndexerPrivate::startWorker, worker, &ctkDICOMIndexerPrivateWorker::start);
 
   // Progress report
-  connect(worker, &ctkDICOMIndexerPrivateWorker::indexingFilePath, q_ptr, &ctkDICOMIndexer::progressDetail);
   connect(worker, &ctkDICOMIndexerPrivateWorker::progress, q_ptr, &ctkDICOMIndexer::progress);
-  connect(worker, &ctkDICOMIndexerPrivateWorker::indexingComplete, this, &ctkDICOMIndexerPrivate::backgroundIndexingComplete);
+  connect(worker, &ctkDICOMIndexerPrivateWorker::progressDetail, q_ptr, &ctkDICOMIndexer::progressDetail);
+  connect(worker, &ctkDICOMIndexerPrivateWorker::progressStep, q_ptr, &ctkDICOMIndexer::progressStep);
+  connect(worker, &ctkDICOMIndexerPrivateWorker::updatingDatabase, q_ptr, &ctkDICOMIndexer::updatingDatabase);
+  connect(worker, &ctkDICOMIndexerPrivateWorker::indexingComplete, q_ptr, &ctkDICOMIndexer::indexingComplete);
 
   this->WorkerThread.start();
 }
@@ -217,52 +275,6 @@ void ctkDICOMIndexerPrivate::pushIndexingRequest(ctkDICOMDatabase& database, con
 }
 
 //------------------------------------------------------------------------------
-void ctkDICOMIndexerPrivate::backgroundIndexingComplete()
-{
-  Q_Q(ctkDICOMIndexer);
-  QTime timeProbe;
-  timeProbe.start();
-  emit q->progressDetail("");
-  emit q->progressStep("Updating database");
-  QList<ctkDICOMDatabase::IndexingResult> indexingResults;
-  this->RequestQueue.popAllIndexingResults(indexingResults);
-  int patientsCount = this->BackgroundIndexingDatabase->patientsCount();
-  int studiesCount = this->BackgroundIndexingDatabase->studiesCount();
-  int seriesCount = this->BackgroundIndexingDatabase->seriesCount();
-  int imagesCount = this->BackgroundIndexingDatabase->imagesCount();
-
-  // Activate batch update
-  emit q->updatingDatabase(true);
-
-  this->BackgroundIndexingDatabase->insert(indexingResults);
-/*  
-  this->BackgroundIndexingDatabase->prepareInsert();
-  foreach(const ctkDICOMDatabase::IndexingResult& indexingResult, indexingResults)
-  {
-    this->BackgroundIndexingDatabase->insert(indexingResult.filePath, *indexingResult.dataset.data(), indexingResult.storeFile, false);
-  }
-  */
-
-  int patientsAdded = this->BackgroundIndexingDatabase->patientsCount() - patientsCount;
-  int studiesAdded = this->BackgroundIndexingDatabase->studiesCount() - studiesCount;
-  int seriesAdded = this->BackgroundIndexingDatabase->seriesCount() - seriesCount;
-  int imagesAdded = this->BackgroundIndexingDatabase->imagesCount() - imagesCount;
-
-  // Update displayed fields according to inserted DICOM datasets
-  emit q->progressDetail("");
-  emit q->progressStep("Updating database displayed fields");
-  this->BackgroundIndexingDatabase->updateDisplayedFields();
-
-  float elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
-  qDebug() << QString("DICOM indexer has successfully inserted %1 files [%2s]")
-    .arg(indexingResults.count()).arg(QString::number(elapsedTimeInSeconds, 'f', 2));
-
-  emit q->updatingDatabase(false);
-
-  emit q->indexingComplete(patientsAdded, studiesAdded, seriesAdded, imagesAdded);
-}
-
-//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // ctkDICOMIndexer methods
@@ -289,6 +301,7 @@ void ctkDICOMIndexer::addFile(ctkDICOMDatabase& database,
   request.inputFilesPath << filePath;
   request.includeHiddenFolders = false;
   request.storeFile = !destinationDirectoryName.isEmpty();
+  request.databaseFolder = database.databaseFilename();
   d->pushIndexingRequest(database, request);
 }
 
@@ -312,6 +325,7 @@ void ctkDICOMIndexer::addDirectory(ctkDICOMDatabase& database,
     request.inputFolderPath = directoryName;
     request.includeHiddenFolders = includeHidden;
     request.storeFile = !destinationDirectoryName.isEmpty();
+    request.databaseFolder = database.databaseFilename();
     d->pushIndexingRequest(database, request);
   }
 }
@@ -326,6 +340,7 @@ void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase& database,
   request.inputFilesPath = listOfFiles;
   request.includeHiddenFolders = false;
   request.storeFile = !destinationDirectoryName.isEmpty();
+  request.databaseFolder = database.databaseFilename();
   d->pushIndexingRequest(database, request);
 }
 

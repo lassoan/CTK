@@ -1689,6 +1689,8 @@ void ctkDICOMBrowser::onIndexingComplete(int patientsAdded, int studiesAdded, in
     d->InformationMessageFrame->show();
   }
 
+  d->dicomTableManager->updateTableViews();
+
   // allow users of this widget to know that the process has finished
   emit directoryImported();
 }
