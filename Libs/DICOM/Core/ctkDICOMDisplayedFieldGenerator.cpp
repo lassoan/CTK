@@ -97,13 +97,13 @@ QStringList ctkDICOMDisplayedFieldGenerator::getRequiredTags()
 }
 
 //------------------------------------------------------------------------------
-void ctkDICOMDisplayedFieldGenerator::updateDisplayedFieldsForInstance( QString sopInstanceUID,
-  QMap<QString, QString> &displayedFieldsForCurrentSeries, QMap<QString, QString> &displayedFieldsForCurrentStudy, QMap<QString, QString> &displayedFieldsForCurrentPatient )
+void ctkDICOMDisplayedFieldGenerator::updateDisplayedFieldsForInstance(
+  const QString& sopInstanceUID, const QMap<QString, QString> &cachedTagsForInstance,
+  QMap<QString, QString> &displayedFieldsForCurrentSeries,
+  QMap<QString, QString> &displayedFieldsForCurrentStudy,
+  QMap<QString, QString> &displayedFieldsForCurrentPatient )
 {
   Q_D(ctkDICOMDisplayedFieldGenerator);
-
-  QMap<QString, QString> cachedTagsForInstance;
-  d->Database->getCachedTags(sopInstanceUID, cachedTagsForInstance);
 
   QMap<QString, QString> newFieldsSeries;
   QMap<QString, QString> newFieldsStudy;

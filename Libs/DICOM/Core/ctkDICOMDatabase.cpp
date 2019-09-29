@@ -1491,9 +1491,8 @@ void ctkDICOMDatabasePrivate::setCountToSeriesDisplayedFields(QMap<QString, QMap
 {
   foreach (QString currentSeriesInstanceUid, displayedFieldsMapSeries.keys())
   {
-    QSqlQuery countQuery(this->TagCacheDatabase);
-    countQuery.prepare("SELECT COUNT(*) FROM TagCache WHERE Tag = ? AND Value = ? ;");
-    countQuery.addBindValue(ctkDICOMItem::TagKeyStripped(DCM_SeriesInstanceUID));
+    QSqlQuery countQuery(this->Database);
+    countQuery.prepare("SELECT COUNT(*) FROM Images WHERE SeriesInstanceUID = ? ;");
     countQuery.addBindValue(currentSeriesInstanceUid);
     if (!countQuery.exec())
     {
@@ -2847,7 +2846,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
     QMap<QString, QString> displayedFieldsForCurrentSeries = displayedFieldsMapSeries[ displayedFieldsKeyForCurrentSeries ];
 
     // Do the update of the displayed fields using the roles
-    d->DisplayedFieldGenerator.updateDisplayedFieldsForInstance(sopInstanceUID,
+    d->DisplayedFieldGenerator.updateDisplayedFieldsForInstance(sopInstanceUID, cachedTags,
       displayedFieldsForCurrentSeries, displayedFieldsForCurrentStudy, displayedFieldsForCurrentPatient);
 
     // Set updated fields to the series / study / patient displayed fields maps

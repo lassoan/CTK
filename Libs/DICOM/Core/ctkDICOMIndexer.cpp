@@ -173,9 +173,6 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
 void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
 {
   QDir::Filters filters = QDir::Files;
-  QTime timeProbe;
-
-  timeProbe.start();
   //emit q->progressDetail("");
   //emit q->progressStep("Updating database");
   QList<ctkDICOMDatabase::IndexingResult> indexingResults;
@@ -193,6 +190,9 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
     // Activate batch update
     emit updatingDatabase(true);
 
+    QTime timeProbe;
+    timeProbe.start();
+
     DICOMDatabase.openDatabase(indexingResults[0].databaseFolder);
 
     int patientsCount = DICOMDatabase.patientsCount();
@@ -208,14 +208,20 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
     seriesAdded = DICOMDatabase.seriesCount() - seriesCount;
     imagesAdded = DICOMDatabase.imagesCount() - imagesCount;
 
+    float elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
+    qDebug() << QString("DICOM indexer has successfully inserted %1 files [%2s]")
+      .arg(indexingResults.count()).arg(QString::number(elapsedTimeInSeconds, 'f', 2));
+
     // Update displayed fields according to inserted DICOM datasets
     emit progressDetail("");
     emit progressStep("Updating database displayed fields");
 
+    timeProbe.start();
+
     DICOMDatabase.updateDisplayedFields();
 
-    float elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
-    qDebug() << QString("DICOM indexer has successfully inserted %1 files [%2s]")
+    elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
+    qDebug() << QString("DICOM indexer has updated display fields for %1 files [%2s]")
       .arg(indexingResults.count()).arg(QString::number(elapsedTimeInSeconds, 'f', 2));
 
     emit updatingDatabase(false);
