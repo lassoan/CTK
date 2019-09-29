@@ -39,7 +39,8 @@ public:
     QStringList inputFilesPath;
     bool includeHiddenFolders;
     bool storeFile;
-    QString databaseFolder;
+    QString databaseFilename;
+    QStringList databaseTagsToPrecache;
   };
 
   DICOMIndexingQueue()

@@ -147,7 +147,8 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
       indexingResult.filePath = filePath;
       indexingResult.storeFile = indexingRequest.storeFile;
       indexingResult.overwriteExistingDataset = datasetAlreadyInDatabase;
-      indexingResult.databaseFolder = indexingRequest.databaseFolder;
+      indexingResult.databaseFilename = indexingRequest.databaseFilename;
+      indexingResult.databaseTagsToPrecache = indexingRequest.databaseTagsToPrecache;
       this->RequestQueue->pushIndexingResult(indexingResult);
     }
     else
@@ -193,7 +194,8 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
     QTime timeProbe;
     timeProbe.start();
 
-    DICOMDatabase.openDatabase(indexingResults[0].databaseFolder);
+    DICOMDatabase.openDatabase(indexingResults[0].databaseFilename);
+    DICOMDatabase.setTagsToPrecache(indexingResults[0].databaseTagsToPrecache);
 
     int patientsCount = DICOMDatabase.patientsCount();
     int studiesCount = DICOMDatabase.studiesCount();
@@ -307,7 +309,8 @@ void ctkDICOMIndexer::addFile(ctkDICOMDatabase& database,
   request.inputFilesPath << filePath;
   request.includeHiddenFolders = false;
   request.storeFile = !destinationDirectoryName.isEmpty();
-  request.databaseFolder = database.databaseFilename();
+  request.databaseFilename = database.databaseFilename();
+  request.databaseTagsToPrecache = database.tagsToPrecache();
   d->pushIndexingRequest(database, request);
 }
 
@@ -331,7 +334,8 @@ void ctkDICOMIndexer::addDirectory(ctkDICOMDatabase& database,
     request.inputFolderPath = directoryName;
     request.includeHiddenFolders = includeHidden;
     request.storeFile = !destinationDirectoryName.isEmpty();
-    request.databaseFolder = database.databaseFilename();
+    request.databaseFilename = database.databaseFilename();
+    request.databaseTagsToPrecache = database.tagsToPrecache();
     d->pushIndexingRequest(database, request);
   }
 }
@@ -346,7 +350,8 @@ void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase& database,
   request.inputFilesPath = listOfFiles;
   request.includeHiddenFolders = false;
   request.storeFile = !destinationDirectoryName.isEmpty();
-  request.databaseFolder = database.databaseFilename();
+  request.databaseFilename = database.databaseFilename();
+  request.databaseTagsToPrecache = database.tagsToPrecache();
   d->pushIndexingRequest(database, request);
 }
 

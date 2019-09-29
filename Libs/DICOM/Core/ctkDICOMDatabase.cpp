@@ -1118,8 +1118,8 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
 
         
         QSqlQuery insertTags(d->TagCacheDatabase);
-        //insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
-        insertTags.prepare("INSERT INTO TagCache VALUES(?,?,?)");
+        insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
+        //insertTags.prepare("INSERT INTO TagCache VALUES(?,?,?)");
         insertTags.bindValue(0, sopInstanceUID);
 
         foreach(const QString& tag, d->TagsToPrecache)
@@ -2262,6 +2262,26 @@ QString ctkDICOMDatabase::fileValue(const QString fileName, QString tag)
   return( this->fileValue(fileName, group, element) );
 }
 
+/*
+//------------------------------------------------------------------------------
+QStringList ctkDICOMDatabase::fileValue(const QStringList& fileNames, const QStringList& tags)
+{
+  unsigned short group, element;
+  this->tagToGroupElement(tag, group, element);
+  QString sopInstanceUID = this->instanceForFile(fileName);
+  QString value = this->cachedTag(sopInstanceUID, tag);
+  if (value == TagNotInInstance || value == ValueIsEmptyString)
+  {
+    return "";
+  }
+  if (value != "")
+  {
+    return value;
+  }
+  return(this->fileValue(fileName, group, element));
+}
+*/
+
 //------------------------------------------------------------------------------
 QString ctkDICOMDatabase::fileValue(const QString fileName, const unsigned short group, const unsigned short element)
 {
@@ -2755,6 +2775,13 @@ bool ctkDICOMDatabase::cacheTag(const QString sopInstanceUID, const QString tag,
 bool ctkDICOMDatabase::cacheTags(const QStringList sopInstanceUIDs, const QStringList tags, QStringList values)
 {
   Q_D(ctkDICOMDatabase);
+  int itemCount = sopInstanceUIDs.size();
+  if (tags.size() != itemCount || values.size() != itemCount)
+  {
+    logger.error("Failed to cache tags: number of inputs do not match");
+    return false;
+  }
+
   if ( !this->tagCacheExists() )
     {
     if ( !this->initializeTagCache() )
@@ -2763,23 +2790,40 @@ bool ctkDICOMDatabase::cacheTags(const QStringList sopInstanceUIDs, const QStrin
       }
     }
 
-  // replace empty strings with special flag string
-  QStringList::iterator i;
-  for (i = values.begin(); i != values.end(); ++i)
+  d->TagCacheDatabase.transaction();
+
+  QSqlQuery insertTags(d->TagCacheDatabase);
+  insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
+
+  QStringList::const_iterator sopInstanceUIDsIt = sopInstanceUIDs.begin();
+  QStringList::const_iterator tagsIt = tags.begin();
+  QStringList::const_iterator valuesIt = values.begin();
+  bool success = true;
+  for (int i = 0; i<itemCount; ++i)
   {
-    if (*i == "")
+    insertTags.bindValue(0, *sopInstanceUIDsIt);
+    insertTags.bindValue(1, *tagsIt);
+    if (valuesIt->isEmpty())
     {
-      *i = TagNotInInstance;
+      // replace empty strings with special flag string
+      insertTags.bindValue(2, TagNotInInstance);
     }
+    else
+    {
+      insertTags.bindValue(2, *valuesIt);
+    }
+    if (!insertTags.exec())
+    {
+      success = false;
+    }
+    ++sopInstanceUIDsIt;
+    ++tagsIt;
+    ++valuesIt;
   }
 
-  QSqlQuery insertTags( d->TagCacheDatabase );
-  //insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
-  insertTags.prepare("INSERT INTO TagCache VALUES(?,?,?)");
-  insertTags.addBindValue(sopInstanceUIDs);
-  insertTags.addBindValue(tags);
-  insertTags.addBindValue(values);
-  return d->loggedExecBatch(insertTags);
+  d->TagCacheDatabase.commit();
+
+  return success;
 }
 
 //------------------------------------------------------------------------------
