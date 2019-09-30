@@ -165,11 +165,14 @@ void ctkDICOMTableViewPrivate::applyColumnProperties()
     return;
   }
 
+  bool stretchedColumnFound = false;
+  int defaultSortByColumn = -1;
+  Qt::SortOrder defaultSortOrder = Qt::AscendingOrder;
+
   QHeaderView* header = this->tblDicomDatabaseView->horizontalHeader();
   int columnCount = this->dicomSQLModel.columnCount();
   QList<int> columnWeights;
   QMap<int,int> visualIndexToColumnIndexMap;
-  bool stretchedColumnFound = false;
   for (int col=0; col<columnCount; ++col)
   {
     QString columnName = this->dicomSQLModel.headerData(col, Qt::Horizontal).toString();
@@ -213,6 +216,8 @@ void ctkDICOMTableViewPrivate::applyColumnProperties()
       if (!fieldFormatObj.isEmpty())
       {
         // format string successfully decoded from json
+
+        // resize mode
         QString resizeModeStr = fieldFormatObj.value(QString("resizeMode")).toString("interactive");
         if (resizeModeStr == "interactive")
         {
@@ -229,6 +234,25 @@ void ctkDICOMTableViewPrivate::applyColumnProperties()
         else
         {
           qWarning() << "Invalid ColumnDisplayProperties Format string for column " << columnName << ": resizeMode must be interactive, stretch, or resizeToContents";
+        }
+
+        // default sort order
+        QString sortStr = fieldFormatObj.value(QString("sort")).toString();
+        if (!sortStr.isEmpty())
+        {
+          defaultSortByColumn = col;
+          if (sortStr == "ascending")
+          {
+            defaultSortOrder = Qt::AscendingOrder;
+          }
+          else if (sortStr == "descending")
+          {
+            defaultSortOrder = Qt::DescendingOrder;
+          }
+          else
+          {
+            qWarning() << "Invalid ColumnDisplayProperties Format string for column " << columnName << ": sort must be ascending or descending";
+          }
         }
 
       }
@@ -248,6 +272,11 @@ void ctkDICOMTableViewPrivate::applyColumnProperties()
 
   // If no stretched column is shown then stretch the last column to make the table look nicely aligned
   this->tblDicomDatabaseView->horizontalHeader()->setStretchLastSection(!stretchedColumnFound);
+
+  if (defaultSortByColumn >= 0)
+  {
+    this->tblDicomDatabaseView->sortByColumn(defaultSortByColumn, defaultSortOrder);
+  }
 
   // First restore original order of the columns so that it can be sorted by weights (use bubble sort).
   // This extra complexity is needed because the only mechanism for column order is by moving or swapping

@@ -37,21 +37,22 @@ class ctkDICOMIndexerPrivate;
 class CTK_DICOM_CORE_EXPORT ctkDICOMIndexer : public QObject
 {
   Q_OBJECT
-  Q_PROPERTY(bool backgroundImporting READ isBackgroundImporting WRITE setBackgroundImporting)
+  Q_PROPERTY(bool backgroundImportEnabled READ isBackgroundImportEnabled WRITE setBackgroundImportEnabled)
   Q_PROPERTY(bool importing READ isImporting)
 
 public:
   explicit ctkDICOMIndexer(QObject *parent = 0);
   virtual ~ctkDICOMIndexer();
 
-  Q_INVOKABLE void setDatabase(QSharedPointer<ctkDICOMDatabase> database);
-  Q_INVOKABLE QSharedPointer<ctkDICOMDatabase> database();
+  Q_INVOKABLE void setDatabase(ctkDICOMDatabase* database);
+  Q_INVOKABLE ctkDICOMDatabase* database();
 
-  /// Enabled importing of files and folders in a background thread.
   /// If enabled, addDirectory and addFile... methods return immediately
+  /// indexing is performed in a background thread,
   /// and progress and completion are indicated by signals.
-  void setBackgroundImporting(bool);
-  bool isBackgroundImporting() const;
+  /// Disabled by default.
+  void setBackgroundImportEnabled(bool);
+  bool isBackgroundImportEnabled() const;
 
   /// Returns with true if background importing is currently in progress.
   bool isImporting();

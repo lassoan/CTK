@@ -221,8 +221,8 @@ Q_SIGNALS:
 public:
   DICOMIndexingQueue RequestQueue;
   QThread WorkerThread;
-  QSharedPointer<ctkDICOMDatabase> Database;
-  bool BackgroundImporting;
+  ctkDICOMDatabase* Database;
+  bool BackgroundImportEnabled;
 };
 
 

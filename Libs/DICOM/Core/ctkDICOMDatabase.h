@@ -309,6 +309,8 @@ public:
   /// Get format of a given field
   /// It contains a json document with the following fields:
   /// - resizeMode: column resize mode. Accepted values are: "interactive" (default), "stretch", or "resizeToContents".
+  /// - sort: default sort order. Accepted values are: empty (default), "ascending" or "descending".
+  ///   Only one column (or none) should have non-empty sort order in each table.
   Q_INVOKABLE QString formatForField(QString table, QString field) const;
   /// Set format of a given field
   Q_INVOKABLE void setFormatForField(QString table, QString field, QString format);

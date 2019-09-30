@@ -108,7 +108,7 @@ INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'PatientsBirthTime',   
 INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'PatientsSex',                     'Sex',                  1, 4, '{"resizeMode":"resizeToContents"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'PatientsAge',                     'Age',                  0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'PatientsComments',                'Comments',             0, 0, '');
-INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'InsertTimestamp',                 'Date added',           1, 6, '');
+INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'InsertTimestamp',                 'Date added',           1, 6, '{"sort": "descending"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'DisplayedPatientsName',           'Patient name',         1, 1, '{"resizeMode":"stretch"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'DisplayedNumberOfStudies',        'Studies',              1, 5, '{"resizeMode":"resizeToContents"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'DisplayedFieldsUpdatedTimestamp', '',                     0, 0, '');
@@ -116,7 +116,7 @@ INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'DisplayedFieldsUpdated
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyInstanceUID',                '',                     0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'PatientsUID',                     '',                     0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyID',                         'Study ID',             1, 1, '');
-INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyDate',                       'Study date',           1, 2, '{"resizeMode":"resizeToContents"}');
+INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyDate',                       'Study date',           1, 2, '{"resizeMode":"resizeToContents", "sort": "ascending"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyTime',                       'Study time',           0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyDescription',                'Study description',    1, 3, '{"resizeMode":"stretch"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'AccessionNumber',                 'Accession #',          0, 0, '');
@@ -130,7 +130,7 @@ INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'DisplayedFieldsUpdated
 
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'SeriesInstanceUID',               '',                     0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'StudyInstanceUID',                '',                     0, 0, '');
-INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'SeriesNumber',                    'Series #',             1, 1, '{"resizeMode":"resizeToContents"}');
+INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'SeriesNumber',                    'Series #',             1, 1, '{"resizeMode":"resizeToContents", "sort": "ascending"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'SeriesDate',                      'Series date',          0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'SeriesTime',                      'Series time',          0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'SeriesDescription',               'Series description',   1, 2, '{"resizeMode":"stretch"}');

@@ -1603,6 +1603,18 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     }
     return;
   }
+
+  // Disable synchronous writing to make modifications faster
+  QSqlQuery pragmaSyncQuery(d->Database);
+  pragmaSyncQuery.exec("PRAGMA synchronous = OFF");
+  pragmaSyncQuery.finish();
+
+  d->Database.exec("PRAGMA journal_mode = MEMORY");
+  if (d->Database.lastError().isValid())
+  {
+    qDebug() << "journal_mode = MEMORY : " << d->Database.lastError();
+  }
+
   if ( d->Database.tables().empty() )
   {
     if (!this->initializeDatabase())
@@ -1622,18 +1634,6 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     QFileSystemWatcher* watcher = new QFileSystemWatcher(QStringList(databaseFile),this);
     connect(watcher, SIGNAL(fileChanged(QString)),this, SIGNAL (databaseChanged()) );
   }
-
-  // Disable synchronous writing to make modifications faster
-  QSqlQuery pragmaSyncQuery(d->Database);
-  pragmaSyncQuery.exec("PRAGMA synchronous = OFF");
-  pragmaSyncQuery.finish();
-
-  d->Database.exec("PRAGMA journal_mode = MEMORY");
-  if (d->Database.lastError().isValid())
-  {
-    qDebug() << "journal_mode = MEMORY : " << d->Database.lastError();
-  }
-
 
   // Set up the tag cache for use later
   QFileInfo fileInfo(d->DatabaseFileName);

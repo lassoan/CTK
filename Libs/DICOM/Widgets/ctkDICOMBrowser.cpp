@@ -38,6 +38,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QStringListModel>
+#include <QTableView>
 #include <QWidgetAction>
 
 // ctkWidgets includes
@@ -193,12 +194,14 @@ ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   , SendActionVisible(false)
   , BatchUpdateBeforeIndexingUpdate(false)
 {
-  this->DICOMIndexer->setDatabase(this->DICOMDatabase);
+  this->DICOMIndexer->setDatabase(this->DICOMDatabase.data());
+  this->DICOMIndexer->setBackgroundImportEnabled(true);
 }
 
 //----------------------------------------------------------------------------
 ctkDICOMBrowserPrivate::~ctkDICOMBrowserPrivate()
 {
+  this->DICOMIndexer->waitForImportFinished();
   if ( UpdateSchemaProgress )
   {
     delete UpdateSchemaProgress;
