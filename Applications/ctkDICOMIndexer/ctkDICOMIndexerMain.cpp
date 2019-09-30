@@ -61,36 +61,37 @@ int main(int argc, char** argv)
   QCoreApplication app(argc, argv);
   QTextStream out(stdout);
 
+  QSharedPointer<ctkDICOMDatabase> myCTK(new ctkDICOMDatabase);
   ctkDICOMIndexer idx;
-  ctkDICOMDatabase myCTK;
-
+  idx.setDatabase(myCTK);
+  idx.setBackgroundImporting(false);
 
   try
   {
     if (std::string("--add") == argv[1])
     {
       {
-        myCTK.openDatabase( argv[2] );
+        myCTK->openDatabase( argv[2] );
         if (argc > 4)
         {
-          idx.addDirectory(myCTK,argv[3],argv[4]);
+          idx.addDirectory(argv[3],argv[4]);
         }
         else
         {
-          idx.addDirectory(myCTK,argv[3]);
+          idx.addDirectory(argv[3]);
         }
       }
     }
     else if (std::string("--init") == argv[1])
     {
-      myCTK.openDatabase( argv[2] );
+      myCTK->openDatabase( argv[2] );
       if (argc > 2)
       {
-        myCTK.initializeDatabase(argv[2]);
+        myCTK->initializeDatabase(argv[2]);
       }
       else
       {
-        myCTK.initializeDatabase();
+        myCTK->initializeDatabase();
       }
     }
     else if (std::string("--cleanup") == argv[1])
@@ -105,8 +106,8 @@ int main(int argc, char** argv)
   }
   catch (std::exception e)
   {
-    std::cerr << "Database error:" << qPrintable(myCTK.lastError());
-    myCTK.closeDatabase();
+    std::cerr << "Database error:" << qPrintable(myCTK->lastError());
+    myCTK->closeDatabase();
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

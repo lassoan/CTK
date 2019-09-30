@@ -63,18 +63,10 @@ class CTK_DICOM_CORE_EXPORT ctkDICOMDatabase : public QObject
 public:
   struct IndexingResult
   {
-    IndexingResult()
-    {
-    }
-    ~IndexingResult()
-    {
-    }
     QString filePath;
     QSharedPointer<ctkDICOMItem> dataset;
-    bool storeFile;
+    bool copyFile;
     bool overwriteExistingDataset;
-    QString databaseFilename;
-    QStringList databaseTagsToPrecache;
   };
 
   explicit ctkDICOMDatabase(QObject *parent = 0);
@@ -349,6 +341,9 @@ Q_SIGNALS:
 
   /// Indicate that an in-memory database has been updated
   void databaseChanged();
+
+  /// Indicate that tagsToPreCache list changed
+  void tagsToPrecacheChanged();
 
   /// Indicate that the schema is about to be updated and how many files will be processed
   void schemaUpdateStarted(int);

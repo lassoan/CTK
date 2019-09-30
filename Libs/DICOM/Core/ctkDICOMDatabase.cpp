@@ -904,7 +904,7 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
     const ctkDICOMItem& ctkDataset = *indexingResult.dataset.data();
     QString filePath = indexingResult.filePath;
     bool generateThumbnail = false;
-    bool storeFile = indexingResult.storeFile;
+    bool storeFile = indexingResult.copyFile;
     //this->BackgroundIndexingDatabase->insert(indexingResult.filePath, *indexingResult.dataset.data(), indexingResult.storeFile, false);
 
     // this is the method that all other insert signatures end up calling
@@ -1119,7 +1119,6 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
         
         QSqlQuery insertTags(d->TagCacheDatabase);
         insertTags.prepare( "INSERT OR REPLACE INTO TagCache VALUES(?,?,?)" );
-        //insertTags.prepare("INSERT INTO TagCache VALUES(?,?,?)");
         insertTags.bindValue(0, sopInstanceUID);
 
         foreach(const QString& tag, d->TagsToPrecache)
@@ -2262,26 +2261,6 @@ QString ctkDICOMDatabase::fileValue(const QString fileName, QString tag)
   return( this->fileValue(fileName, group, element) );
 }
 
-/*
-//------------------------------------------------------------------------------
-QStringList ctkDICOMDatabase::fileValue(const QStringList& fileNames, const QStringList& tags)
-{
-  unsigned short group, element;
-  this->tagToGroupElement(tag, group, element);
-  QString sopInstanceUID = this->instanceForFile(fileName);
-  QString value = this->cachedTag(sopInstanceUID, tag);
-  if (value == TagNotInInstance || value == ValueIsEmptyString)
-  {
-    return "";
-  }
-  if (value != "")
-  {
-    return value;
-  }
-  return(this->fileValue(fileName, group, element));
-}
-*/
-
 //------------------------------------------------------------------------------
 QString ctkDICOMDatabase::fileValue(const QString fileName, const unsigned short group, const unsigned short element)
 {
@@ -2422,10 +2401,15 @@ void ctkDICOMDatabase::insert( const QString& filePath, bool storeFile, bool gen
 }
 
 //------------------------------------------------------------------------------
-void ctkDICOMDatabase::setTagsToPrecache( const QStringList tags)
+void ctkDICOMDatabase::setTagsToPrecache(const QStringList tags)
 {
   Q_D(ctkDICOMDatabase);
+  if (d->TagsToPrecache == tags)
+  {
+    return;
+  }
   d->TagsToPrecache = tags;
+  emit tagsToPrecacheChanged();
 }
 
 //------------------------------------------------------------------------------

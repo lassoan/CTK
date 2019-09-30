@@ -144,9 +144,6 @@ public:
 
   void showUpdateSchemaDialog();
 
-  // used when suspending the ctkDICOMModel
-  QSqlDatabase EmptyDatabase;
-
   bool DisplayImportSummary;
   bool ConfirmRemove;
   bool ShemaUpdateAutoCreateDirectory;
@@ -182,7 +179,7 @@ ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   , QueryRetrieveWidget(0)
   , DICOMDatabase( QSharedPointer<ctkDICOMDatabase>(new ctkDICOMDatabase) )
   , DICOMIndexer( QSharedPointer<ctkDICOMIndexer>(new ctkDICOMIndexer) )
-    , UpdateSchemaProgress(0)
+  , UpdateSchemaProgress(0)
   , UpdateDisplayedFieldsProgress(0)
   , ExportProgress(0)
   , DisplayImportSummary(true)
@@ -196,6 +193,7 @@ ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   , SendActionVisible(false)
   , BatchUpdateBeforeIndexingUpdate(false)
 {
+  this->DICOMIndexer->setDatabase(this->DICOMDatabase);
 }
 
 //----------------------------------------------------------------------------
@@ -280,7 +278,6 @@ void ctkDICOMBrowserPrivate::init()
 
   // Signal for displayed fields update
   q->connect(this->DICOMDatabase.data(), SIGNAL(displayedFieldsUpdateStarted()), q, SLOT(showUpdateDisplayedFieldsDialog()));
-  q->connect(this->DICOMIndexer.data(), SIGNAL(displayedFieldsUpdateStarted()), q, SLOT(showUpdateDisplayedFieldsDialog()));
 
   // Set ToolBar button style
   this->ToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -927,8 +924,8 @@ void ctkDICOMBrowserPrivate::importDirectory(QString directory, ctkDICOMBrowser:
     targetDirectory = this->DICOMDatabase->databaseDirectory();
   }
 
-  // show progress dialog and perform indexing
-  this->DICOMIndexer->addDirectory(*this->DICOMDatabase, directory, targetDirectory);
+  // Start background indexing
+  this->DICOMIndexer->addDirectory(directory, mode == ctkDICOMBrowser::ImportDirectoryCopy);
 }
 
 //----------------------------------------------------------------------------

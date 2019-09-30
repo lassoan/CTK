@@ -114,6 +114,8 @@ ctkDICOMAppWidgetPrivate::ctkDICOMAppWidgetPrivate(ctkDICOMAppWidget* parent): q
   ThumbnailGenerator = QSharedPointer <ctkDICOMThumbnailGenerator> (new ctkDICOMThumbnailGenerator);
   DICOMDatabase->setThumbnailGenerator(ThumbnailGenerator.data());
   DICOMIndexer = QSharedPointer<ctkDICOMIndexer> (new ctkDICOMIndexer);
+  DICOMIndexer->setDatabase(DICOMDatabase);
+  DICOMIndexer->setBackgroundImporting(false);
   IndexerProgress = 0;
   UpdateSchemaProgress = 0;
   DisplayImportSummary = true;
@@ -670,10 +672,7 @@ void ctkDICOMAppWidget::onImportDirectory(QString directory)
     {
     QCheckBox* copyOnImport = qobject_cast<QCheckBox*>(d->ImportDialog->bottomWidget());
     QString targetDirectory;
-    if (copyOnImport->checkState() == Qt::Checked)
-      {
-      targetDirectory = d->DICOMDatabase->databaseDirectory();
-      }
+    bool copyFiles = (copyOnImport->checkState() == Qt::Checked);
 
     // reset counts
     d->PatientsAddedDuringImport = 0;
@@ -683,7 +682,7 @@ void ctkDICOMAppWidget::onImportDirectory(QString directory)
 
     // show progress dialog and perform indexing
     d->showIndexerDialog();
-    d->DICOMIndexer->addDirectory(*d->DICOMDatabase,directory,targetDirectory);
+    d->DICOMIndexer->addDirectory(directory, copyFiles);
 
     // display summary result
     if (d->DisplayImportSummary)

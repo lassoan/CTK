@@ -37,9 +37,24 @@ class ctkDICOMIndexerPrivate;
 class CTK_DICOM_CORE_EXPORT ctkDICOMIndexer : public QObject
 {
   Q_OBJECT
+  Q_PROPERTY(bool backgroundImporting READ isBackgroundImporting WRITE setBackgroundImporting)
+  Q_PROPERTY(bool importing READ isImporting)
+
 public:
   explicit ctkDICOMIndexer(QObject *parent = 0);
   virtual ~ctkDICOMIndexer();
+
+  Q_INVOKABLE void setDatabase(QSharedPointer<ctkDICOMDatabase> database);
+  Q_INVOKABLE QSharedPointer<ctkDICOMDatabase> database();
+
+  /// Enabled importing of files and folders in a background thread.
+  /// If enabled, addDirectory and addFile... methods return immediately
+  /// and progress and completion are indicated by signals.
+  void setBackgroundImporting(bool);
+  bool isBackgroundImporting() const;
+
+  /// Returns with true if background importing is currently in progress.
+  bool isImporting();
 
   ///
   /// \brief Adds directory to database and optionally copies files to
@@ -52,8 +67,7 @@ public:
   /// DICOM folders may be created based on series or study name, which sometimes start
   /// with a . character, therefore it is advisable to include hidden files and folders.
   ///
-  Q_INVOKABLE void addDirectory(ctkDICOMDatabase& database, const QString& directoryName,
-                    const QString& destinationDirectoryName = "", bool includeHidden = true);
+  Q_INVOKABLE void addDirectory(const QString& directoryName, bool copyFile = false, bool includeHidden = true);
 
   ///
   /// \brief Adds directory to database by using DICOMDIR and optionally copies files to
@@ -62,8 +76,7 @@ public:
   /// DICOM images accordingly.
   /// \return Returns false if there was an error while processing the DICOMDIR file.
   ///
-  Q_INVOKABLE bool addDicomdir(ctkDICOMDatabase& database, const QString& directoryName,
-                    const QString& destinationDirectoryName = "");
+  Q_INVOKABLE bool addDicomdir(const QString& directoryName, bool copyFile = false);
 
   ///
   /// \brief Adds a QStringList containing the file path to database and optionally copies files to
@@ -72,8 +85,7 @@ public:
   /// Scan the directory using Dcmtk and populate the database with all the
   /// DICOM images accordingly.
   ///
-  Q_INVOKABLE void addListOfFiles(ctkDICOMDatabase& database, const QStringList& listOfFiles,
-                    const QString& destinationDirectoryName = "");
+  Q_INVOKABLE void addListOfFiles(const QStringList& listOfFiles, bool copyFile = false);
 
   ///
   /// \brief Adds a file to database and optionally copies the file to
@@ -85,11 +97,11 @@ public:
   /// Scan the file using Dcmtk and populate the database with all the
   /// DICOM fields accordingly.
   ///
-  Q_INVOKABLE void addFile(ctkDICOMDatabase& database, const QString filePath,
-                    const QString& destinationDirectoryName = "");
+  Q_INVOKABLE void addFile(const QString filePath, bool copyFile = false);
 
   ///
   /// \brief Wait for all the indexing operations to complete
+  /// This can be useful to ensure that importing is completed when background indexing is enabled.
   /// msecTimeout specifies a maximum timeout. If <0 then it means wait indefinitely.
   Q_INVOKABLE void waitForImportFinished(int msecTimeout = -1);
 
@@ -107,6 +119,10 @@ Q_SIGNALS:
 public Q_SLOTS:
   /// Stop indexing (all completed indexing results will be added to the database)
   void cancel();
+
+protected Q_SLOTS:
+  void databaseFilenameChanged();
+  void tagsToPrecacheChanged();
 
 protected:
   QScopedPointer<ctkDICOMIndexerPrivate> d_ptr;
