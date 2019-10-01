@@ -78,6 +78,7 @@ public:
 
   typedef QWidget Superclass;
   explicit ctkDICOMBrowser(QWidget* parent=0);
+  explicit ctkDICOMBrowser(QSharedPointer<ctkDICOMDatabase> sharedDatabase, QWidget* parent=0);
   virtual ~ctkDICOMBrowser();
 
   /// Directory being used to store the dicom database
@@ -183,6 +184,9 @@ public Q_SLOTS:
   ///
   /// By default, \a mode is ImportDirectoryMode::ImportDirectoryAddLink is set.
   void importDirectory(QString directory, ctkDICOMBrowser::ImportDirectoryMode mode = ImportDirectoryAddLink);
+
+  /// Wait for all import operations to complete
+  void waitForImportFinished();
 
   /// \deprecated importDirectory() should be used
   void onImportDirectory(QString directory, ctkDICOMBrowser::ImportDirectoryMode mode = ImportDirectoryAddLink);

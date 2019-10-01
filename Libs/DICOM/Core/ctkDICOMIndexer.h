@@ -69,6 +69,8 @@ public:
   /// with a . character, therefore it is advisable to include hidden files and folders.
   ///
   Q_INVOKABLE void addDirectory(const QString& directoryName, bool copyFile = false, bool includeHidden = true);
+  /// Kept for backward compatibility
+  Q_INVOKABLE void addDirectory(ctkDICOMDatabase* db, const QString& directoryName, bool copyFile = false, bool includeHidden = true);
 
   ///
   /// \brief Adds directory to database by using DICOMDIR and optionally copies files to
@@ -78,6 +80,8 @@ public:
   /// \return Returns false if there was an error while processing the DICOMDIR file.
   ///
   Q_INVOKABLE bool addDicomdir(const QString& directoryName, bool copyFile = false);
+  /// Kept for backward compatibility
+  Q_INVOKABLE bool addDicomdir(ctkDICOMDatabase* db, const QString& directoryName, bool copyFile = false);
 
   ///
   /// \brief Adds a QStringList containing the file path to database and optionally copies files to
@@ -87,6 +91,8 @@ public:
   /// DICOM images accordingly.
   ///
   Q_INVOKABLE void addListOfFiles(const QStringList& listOfFiles, bool copyFile = false);
+  /// Kept for backward compatibility
+  Q_INVOKABLE void addListOfFiles(ctkDICOMDatabase* db, const QStringList& listOfFiles, bool copyFile = false);
 
   ///
   /// \brief Adds a file to database and optionally copies the file to
@@ -99,6 +105,8 @@ public:
   /// DICOM fields accordingly.
   ///
   Q_INVOKABLE void addFile(const QString filePath, bool copyFile = false);
+  /// Kept for backward compatibility
+  void addFile(ctkDICOMDatabase* db, const QString filePath, bool copyFile = false);
 
   ///
   /// \brief Wait for all the indexing operations to complete

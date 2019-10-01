@@ -76,25 +76,29 @@ ctkDICOMIndexerPrivateWorker::~ctkDICOMIndexerPrivateWorker()
 //------------------------------------------------------------------------------
 void ctkDICOMIndexerPrivateWorker::start()
 {
-  if (this->RequestQueue->setIndexing(true))
-  {
-    // it was already indexing, nothing to do
-    return;
-  }
   // Make a local copy to avoid the need of frequent locking
   this->RequestQueue->modifiedTimeForFilepath(this->ModifiedTimeForFilepath);
   this->CompletedRequestCount = 0;
   do 
   {
+    if (this->RequestQueue->isStopRequested())
+    {
+      this->RequestQueue->removeAllIndexingRequests();
+      this->RequestQueue->setStopRequested(false);
+    }
     DICOMIndexingQueue::IndexingRequest indexingRequest;
     this->RemainingRequestCount = this->RequestQueue->popIndexingRequest(indexingRequest);
-    if (this->RemainingRequestCount == -1 || this->RequestQueue->isStopRequested())
+    if (this->RemainingRequestCount < 0)
     {
       // finished
-      this->RequestQueue->setStopRequested(false);
-      this->RequestQueue->setIndexing(false);
       this->writeIndexingResultsToDatabase();
-      return;
+      // check if we got any new requests while we were writing results to database
+      this->RemainingRequestCount = this->RequestQueue->popIndexingRequest(indexingRequest);
+      if (this->RemainingRequestCount < 0)
+      {
+        this->RequestQueue->setIndexing(false);
+        return;
+      }
     }
     this->processIndexingRequest(indexingRequest);
     this->CompletedRequestCount++;
@@ -195,6 +199,12 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
     DICOMDatabase.openDatabase(this->RequestQueue->databaseFilename());
     DICOMDatabase.setTagsToPrecache(this->RequestQueue->tagsToPrecache());
 
+    QStringList tags = this->RequestQueue->tagsToPrecache();
+    foreach(QString tag, tags)
+    {
+      qDebug() << tag;
+    }
+
     int patientsCount = DICOMDatabase.patientsCount();
     int studiesCount = DICOMDatabase.studiesCount();
     int seriesCount = DICOMDatabase.seriesCount();
@@ -289,6 +299,7 @@ void ctkDICOMIndexerPrivate::pushIndexingRequest(const DICOMIndexingQueue::Index
   if (!this->RequestQueue.isIndexing())
   {
     // Start background indexing
+    this->RequestQueue.setIndexing(true);
     QMap<QString, QDateTime> modifiedTimeForFilepath;
     this->Database->allFilesModifiedTimes(modifiedTimeForFilepath);
     this->RequestQueue.setModifiedTimeForFilepath(modifiedTimeForFilepath);
@@ -378,8 +389,13 @@ ctkDICOMDatabase* ctkDICOMIndexer::database()
    }
  }
 
-
-
+ //------------------------------------------------------------------------------
+ void ctkDICOMIndexer::addFile(ctkDICOMDatabase* db, const QString filePath, bool copyFile/*=false*/)
+ {
+   this->setDatabase(db);
+   this->addDirectory(filePath, copyFile);
+ }
+ 
 //------------------------------------------------------------------------------
 void ctkDICOMIndexer::addFile(const QString filePath, bool copyFile/*=false*/)
 {
@@ -393,6 +409,13 @@ void ctkDICOMIndexer::addFile(const QString filePath, bool copyFile/*=false*/)
   {
     this->waitForImportFinished();
   }
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMIndexer::addDirectory(ctkDICOMDatabase* db, const QString& directoryName, bool copyFile/*=false*/, bool includeHidden/*=true*/)
+{
+  this->setDatabase(db);
+  this->addDirectory(directoryName, copyFile, includeHidden);
 }
 
 //------------------------------------------------------------------------------
@@ -421,6 +444,13 @@ void ctkDICOMIndexer::addDirectory(const QString& directoryName, bool copyFile/*
 }
 
 //------------------------------------------------------------------------------
+void ctkDICOMIndexer::addListOfFiles(ctkDICOMDatabase* db, const QStringList& listOfFiles, bool copyFile/*=false*/)
+{
+  this->setDatabase(db);
+  this->addListOfFiles(listOfFiles, copyFile);
+}
+
+//------------------------------------------------------------------------------
 void ctkDICOMIndexer::addListOfFiles(const QStringList& listOfFiles, bool copyFile/*=false*/)
 {
   Q_D(ctkDICOMIndexer);
@@ -433,6 +463,13 @@ void ctkDICOMIndexer::addListOfFiles(const QStringList& listOfFiles, bool copyFi
   {
     this->waitForImportFinished();
   }
+}
+
+//------------------------------------------------------------------------------
+bool ctkDICOMIndexer::addDicomdir(ctkDICOMDatabase* db, const QString& directoryName, bool copyFile/*=false*/)
+{
+  this->setDatabase(db);
+  return this->addDicomdir(directoryName, copyFile);
 }
 
 //------------------------------------------------------------------------------

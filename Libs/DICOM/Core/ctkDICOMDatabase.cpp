@@ -1644,7 +1644,12 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
     this->initializeTagCache();
   }
 
-  this->setTagsToPrecache(d->DisplayedFieldGenerator.getRequiredTags());
+  // Add displayed field generator's required tags to the pre-cached list to make
+  // displayed field updates fast.
+  QStringList tags = this->tagsToPrecache();
+  tags << d->DisplayedFieldGenerator.getRequiredTags();
+  tags.removeDuplicates();
+  this->setTagsToPrecache(tags);
 
   emit opened();
 }

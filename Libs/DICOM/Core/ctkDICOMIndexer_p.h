@@ -80,6 +80,12 @@ public:
     this->TagsToPrecache = tags;
   }
 
+  void removeAllIndexingRequests()
+  {
+    QMutexLocker locker(&this->Mutex);
+    this->IndexingRequests.clear();
+  }
+
   int popIndexingRequest(IndexingRequest& indexingRequest)
   {
     QMutexLocker locker(&this->Mutex);
@@ -122,12 +128,10 @@ public:
     this->ModifiedTimeForFilepath = timesForPaths;
   }
 
-  bool setIndexing(bool indexing)
+  void setIndexing(bool indexing)
   {
     QMutexLocker locker(&this->Mutex);
-    bool wasIndexing = this->IsIndexing;
     this->IsIndexing = indexing;
-    return wasIndexing;
   }
 
   bool isIndexing()

@@ -123,7 +123,7 @@ public:
   ctkDICOMBrowser* const q_ptr;
   Q_DECLARE_PUBLIC(ctkDICOMBrowser);
 
-  ctkDICOMBrowserPrivate(ctkDICOMBrowser*);
+  ctkDICOMBrowserPrivate(ctkDICOMBrowser*, QSharedPointer<ctkDICOMDatabase> database);
   ~ctkDICOMBrowserPrivate();
 
   void init();
@@ -173,12 +173,12 @@ CTK_GET_CPP(ctkDICOMBrowser, bool, isSendActionVisible, SendActionVisible);
 // ctkDICOMBrowserPrivate methods
 
 //----------------------------------------------------------------------------
-ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
+ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent, QSharedPointer<ctkDICOMDatabase> database)
   : q_ptr(parent)
   , ImportDialog(0)
   , MetadataDialog(0)
   , QueryRetrieveWidget(0)
-  , DICOMDatabase( QSharedPointer<ctkDICOMDatabase>(new ctkDICOMDatabase) )
+  , DICOMDatabase(database)
   , DICOMIndexer( QSharedPointer<ctkDICOMIndexer>(new ctkDICOMIndexer) )
   , UpdateSchemaProgress(0)
   , UpdateDisplayedFieldsProgress(0)
@@ -194,8 +194,10 @@ ctkDICOMBrowserPrivate::ctkDICOMBrowserPrivate(ctkDICOMBrowser* parent)
   , SendActionVisible(false)
   , BatchUpdateBeforeIndexingUpdate(false)
 {
-  this->DICOMIndexer->setDatabase(this->DICOMDatabase.data());
-  this->DICOMIndexer->setBackgroundImportEnabled(true);
+  if (this->DICOMDatabase.isNull())
+  {
+    this->DICOMDatabase = QSharedPointer<ctkDICOMDatabase>(new ctkDICOMDatabase);
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -251,6 +253,9 @@ void ctkDICOMBrowserPrivate::init()
   Q_Q(ctkDICOMBrowser);
 
   qRegisterMetaType<ctkDICOMBrowser::ImportDirectoryMode>("ctkDICOMBrowser::ImportDirectoryMode");
+
+  this->DICOMIndexer->setDatabase(this->DICOMDatabase.data());
+  this->DICOMIndexer->setBackgroundImportEnabled(true);
 
   this->setupUi(q);
 
@@ -363,7 +368,16 @@ void ctkDICOMBrowserPrivate::init()
 //----------------------------------------------------------------------------
 ctkDICOMBrowser::ctkDICOMBrowser(QWidget* _parent)
   : Superclass(_parent),
-  d_ptr(new ctkDICOMBrowserPrivate(this))
+  d_ptr(new ctkDICOMBrowserPrivate(this, QSharedPointer<ctkDICOMDatabase>()))
+{
+  Q_D(ctkDICOMBrowser);
+  d->init();
+}
+
+//----------------------------------------------------------------------------
+ctkDICOMBrowser::ctkDICOMBrowser(QSharedPointer<ctkDICOMDatabase> sharedDatabase, QWidget* _parent)
+  : Superclass(_parent),
+  d_ptr(new ctkDICOMBrowserPrivate(this, sharedDatabase))
 {
   Q_D(ctkDICOMBrowser);
   d->init();
@@ -911,6 +925,13 @@ void ctkDICOMBrowser::importDirectory(QString directory, ctkDICOMBrowser::Import
 void ctkDICOMBrowser::onImportDirectory(QString directory, ctkDICOMBrowser::ImportDirectoryMode mode)
 {
   this->importDirectory(directory, mode);
+}
+
+//----------------------------------------------------------------------------
+void ctkDICOMBrowser::waitForImportFinished()
+{
+  Q_D(ctkDICOMBrowser);
+  d->DICOMIndexer->waitForImportFinished();
 }
 
 //----------------------------------------------------------------------------
