@@ -51,13 +51,13 @@
        <number>6</number>
       </property>
       <property name="topMargin">
-       <number>6</number>
+       <number>0</number>
       </property>
       <property name="rightMargin">
        <number>6</number>
       </property>
       <property name="bottomMargin">
-       <number>6</number>
+       <number>3</number>
       </property>
       <item>
        <widget class="QLabel" name="lblPatients">
@@ -157,7 +157,7 @@ QSplitter::handle:vertical {height: 2px;}</string>
       <enum>Qt::Horizontal</enum>
      </property>
      <property name="handleWidth">
-      <number>2</number>
+      <number>0</number>
      </property>
      <property name="childrenCollapsible">
       <bool>false</bool>

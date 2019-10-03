@@ -199,12 +199,6 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
     DICOMDatabase.openDatabase(this->RequestQueue->databaseFilename());
     DICOMDatabase.setTagsToPrecache(this->RequestQueue->tagsToPrecache());
 
-    QStringList tags = this->RequestQueue->tagsToPrecache();
-    foreach(QString tag, tags)
-    {
-      qDebug() << tag;
-    }
-
     int patientsCount = DICOMDatabase.patientsCount();
     int studiesCount = DICOMDatabase.studiesCount();
     int seriesCount = DICOMDatabase.seriesCount();

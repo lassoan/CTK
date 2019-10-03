@@ -259,6 +259,8 @@ void ctkDICOMBrowserPrivate::init()
 
   this->setupUi(q);
 
+  this->ActionSend->setVisible(this->SendActionVisible);
+
   this->DatabaseDirectoryProblemFrame->hide();
   this->InformationMessageFrame->hide();
   this->ProgressFrame->hide();
@@ -568,14 +570,6 @@ void ctkDICOMBrowser::setDatabaseDirectory(const QString& directory)
   d->InformationMessageFrame->hide();
 
   QString absDirectory = QDir(directory).absolutePath();
-
-  // If needed, create database directory
-  /*
-  if (!QDir(directory).exists())
-  {
-    QDir().mkpath(directory);
-  }
-  */
 
   // close the active DICOM database
   d->DICOMDatabase->closeDatabase();

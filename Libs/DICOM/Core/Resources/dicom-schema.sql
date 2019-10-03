@@ -115,8 +115,8 @@ INSERT INTO 'ColumnDisplayProperties' VALUES('Patients', 'DisplayedFieldsUpdated
 
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyInstanceUID',                '',                     0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'PatientsUID',                     '',                     0, 0, '');
-INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyID',                         'Study ID',             1, 1, '');
-INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyDate',                       'Study date',           1, 2, '{"resizeMode":"resizeToContents", "sort": "ascending"}');
+INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyID',                         'Study ID',             1, 2, '');
+INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyDate',                       'Study date',           1, 1, '{"resizeMode":"resizeToContents", "sort": "ascending"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyTime',                       'Study time',           0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'StudyDescription',                'Study description',    1, 3, '{"resizeMode":"stretch"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Studies',  'AccessionNumber',                 'Accession #',          0, 0, '');
@@ -143,7 +143,7 @@ INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'ScanningSequence',    
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'EchoNumber',                      'Echo #',               0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'TemporalPosition',                'Temporal position',    0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'InsertTimestamp',                 'Date added',           1, 6, '');
-INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'DisplayedCount',                  'Count',                1, 4, '{"resizeMode":"resizeToContents"}');
-INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'DisplayedSize',                   'Size',                 1, 5, '{"resizeMode":"resizeToContents"}');
+INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'DisplayedSize',                   'Size',                 1, 4, '{"resizeMode":"resizeToContents"}');
+INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'DisplayedCount',                  'Count',                1, 5, '{"resizeMode":"resizeToContents"}');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'DisplayedNumberOfFrames',         'Number of frames',     0, 0, '');
 INSERT INTO 'ColumnDisplayProperties' VALUES('Series',   'DisplayedFieldsUpdatedTimestamp', '',                     0, 0, '');
