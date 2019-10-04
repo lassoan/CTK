@@ -295,6 +295,7 @@ void ctkDICOMBrowserPrivate::init()
   // Initialize Q/R widget
   this->QueryRetrieveWidget = new ctkDICOMQueryRetrieveWidget();
   this->QueryRetrieveWidget->setWindowModality ( Qt::ApplicationModal );
+  this->QueryRetrieveWidget->useProgressDialog(true);
   
   this->dicomTableManager->setDICOMDatabase(this->DICOMDatabase.data());
 

@@ -170,7 +170,7 @@ public:
   QMap<QString, int> InsertedPatientsCompositeIDCache; // map from composite patient ID to database ID
   QSet<QString> InsertedStudyUIDsCache;
   QSet<QString> InsertedSeriesUIDsCache;
-  
+
   /// There is no unique patient ID. We use this composite ID in InsertedPatientsCompositeIDCache.
   /// It is not a problem that is somewhat more strict than the criteria that is used to decide if a study should be insert
   /// under the same patient.
@@ -724,7 +724,7 @@ bool ctkDICOMDatabasePrivate::indexingStatusForFile(const QString& filePath, con
 
   datasetInDatabase = true;
 
-  // The SOP instance UID exists in the database. In theory, new SOP instance UID must be generated if 
+  // The SOP instance UID exists in the database. In theory, new SOP instance UID must be generated if
   // a file is modified, but some software may not respect this, so check if the file was modified.
   databaseFilename = fileExistsQuery.value(1).toString();
   QDateTime fileLastModified(QFileInfo(databaseFilename).lastModified());
@@ -854,7 +854,8 @@ bool ctkDICOMDatabasePrivate::uidsForDataSet(const ctkDICOMItem& dataset,
     // see: http://www.na-mic.org/Bug/view.php?id=1643
     patientsName = patientID;
   }
-  if (patientsName.isEmpty() || studyInstanceUID.isEmpty() || patientID.isEmpty() || seriesInstanceUID.isEmpty())
+  // We accept the dataset without seriesInstanceUID, as query/retrieve result may not contain it
+  if (patientsName.isEmpty() || studyInstanceUID.isEmpty() || patientID.isEmpty())
   {
     logger.error("Required information (patient name, patient ID, study instance UID) is missing from dataset");
     return false;
@@ -922,7 +923,7 @@ void ctkDICOMDatabasePrivate::insert(const ctkDICOMItem& dataset, const QString&
     }
   }
 
-  this->insertPatientStudySeries(dataset, patientID, patientsName);
+  bool databaseWasChanged = this->insertPatientStudySeries(dataset, patientID, patientsName);
 
   if (!storedFilePath.isEmpty() && !seriesInstanceUID.isEmpty())
   {
@@ -953,13 +954,14 @@ void ctkDICOMDatabasePrivate::insert(const ctkDICOMItem& dataset, const QString&
       {
         qDebug() << "Instance Added";
       }
+      databaseWasChanged = true;
     }
     if (generateThumbnail)
     {
       this->storeThumbnailFile(storedFilePath, studyInstanceUID, seriesInstanceUID, sopInstanceUID);
     }
   }
-  if (q->isInMemory())
+  if (q->isInMemory() && databaseWasChanged)
   {
     emit q->databaseChanged();
   }
@@ -1592,6 +1594,8 @@ bool ctkDICOMDatabase::initializeDatabase(const char* sqlFileName/* = ":/dicom/d
   QSqlQuery dropSchemaInfo(d->Database);
   d->loggedExec( dropSchemaInfo, QString("DROP TABLE IF EXISTS 'SchemaInfo';") );
   return d->executeScript(sqlFileName);
+
+  emit databaseChanged();
 }
 
 //------------------------------------------------------------------------------
