@@ -106,7 +106,7 @@ public:
   ///
   Q_INVOKABLE void addFile(const QString filePath, bool copyFile = false);
   /// Kept for backward compatibility
-  void addFile(ctkDICOMDatabase* db, const QString filePath, bool copyFile = false);
+  Q_INVOKABLE void addFile(ctkDICOMDatabase* db, const QString filePath, bool copyFile = false);
 
   ///
   /// \brief Wait for all the indexing operations to complete

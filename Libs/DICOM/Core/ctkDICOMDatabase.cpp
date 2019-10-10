@@ -106,6 +106,7 @@ public:
 
   /// Get basic UIDs for a data set, return true if the data set has all the required tags
   bool uidsForDataSet(const ctkDICOMItem& dataset, QString& patientsName, QString& patientID, QString& studyInstanceUID, QString& seriesInstanceUID);
+  bool uidsForDataSet(QString& patientsName, QString& patientID, QString& studyInstanceUID);
 
   /// Dataset must be set always
   /// \param filePath It has to be set if this is an import of an actual file
@@ -118,13 +119,14 @@ public:
   /// \return Success flag
   bool applyDisplayedFieldsChanges( QMap<QString, QMap<QString, QString> > &displayedFieldsMapSeries,
                                     QMap<QString, QMap<QString, QString> > &displayedFieldsMapStudy,
-                                    QVector<QMap<QString, QString> > &displayedFieldsVectorPatient );
+                                    QMap<QString, QMap<QString, QString> > &displayedFieldsMapPatient );
 
-  /// Find patient by both patient ID and patient name and return its index and insert it in the given fields map
-  /// \param displayedFieldsVectorPatient Vector of patient field maps (name, value pairs) to which the found patient
+  /// Find patient by composite patient ID and return its index and insert it in the given fields map
+  /// \param displayedFieldsMapPatient Map of patient field maps (name, value pairs) to which the found patient
   ///   is inserted on success. Also contains the generated patient index
-  /// \return Generated patient index that is an incremental UID for temporal and internal use (so that there is a single identifier for patients)
-  int getDisplayPatientFieldsIndex(QString patientsName, QString patientID, QVector<QMap<QString, QString> > &displayedFieldsVectorPatient);
+  /// \return The composite patient ID if successfully gound, empty string otherwise
+  QString getDisplayPatientFieldsKey(const QString& patientID, const QString& patientsName, const QString& patientsBirthDate,
+    QMap<QString, QMap<QString, QString> >& displayedFieldsMapPatient);
 
   /// Find study by instance UID and insert it in the given fields map
   /// \param displayedFieldsMapStudy Map of study field maps (name, value pairs) to which the found study has been inserted on success
@@ -148,7 +150,7 @@ public:
   void setNumberOfSeriesToStudyDisplayedFields(QMap<QString, QMap<QString, QString> > &displayedFieldsMapStudy);
   /// Calculate number of studies for each patient in the displayed fields container
   /// \param displayedFieldsVectorPatient (Internal_ID -> (DisplayField -> Value) )
-  void setNumberOfStudiesToPatientDisplayedFields(QVector<QMap<QString, QString> > &displayedFieldsVectorPatient);
+  void setNumberOfStudiesToPatientDisplayedFields(QMap<QString, QMap<QString, QString> >& displayedFieldsMapPatient);
 
   int rowCount(const QString& tableName);
 
@@ -400,9 +402,13 @@ bool ctkDICOMDatabasePrivate::insertPatient(const ctkDICOMItem& dataset, int& db
   dbPatientID = -1;
 
   // Check if patient is already present in the db
-  // TODO: maybe add birthdate check for extra safety
-  QString patientID(dataset.GetElementAsString(DCM_PatientID));
-  QString patientsName(dataset.GetElementAsString(DCM_PatientName));
+
+  QString patientsName, patientID, studyInstanceUID, seriesInstanceUID;
+  if (!this->uidsForDataSet(dataset, patientsName, patientID, studyInstanceUID, seriesInstanceUID))
+  {
+    // error occurred, message is already logged
+    return false;
+  }
   QString patientsBirthDate(dataset.GetElementAsString(DCM_PatientBirthDate));
 
   QSqlQuery checkPatientExistsQuery(this->Database);
@@ -416,8 +422,13 @@ bool ctkDICOMDatabasePrivate::insertPatient(const ctkDICOMItem& dataset, int& db
   {
     // we found him
     dbPatientID = checkPatientExistsQuery.value(checkPatientExistsQuery.record().indexOf("UID")).toInt();
-    this->InsertedPatientsCompositeIDCache[compositeID] = dbPatientID;
     qDebug() << "Found patient in the database as UId: " << dbPatientID;
+    foreach(QString key, this->InsertedPatientsCompositeIDCache.keys())
+    {
+      qDebug() << "Patient ID cache item: " << key<< "->" << this->InsertedPatientsCompositeIDCache[key];
+    }
+    qDebug() << "New patient ID cache item: " << compositeID << "->" << dbPatientID;
+    this->InsertedPatientsCompositeIDCache[compositeID] = dbPatientID;
     return false;
   }
   else
@@ -446,8 +457,7 @@ bool ctkDICOMDatabasePrivate::insertPatient(const ctkDICOMItem& dataset, int& db
     loggedExec(insertPatientStatement);
     dbPatientID = insertPatientStatement.lastInsertId().toInt();
     this->InsertedPatientsCompositeIDCache[compositeID] = dbPatientID;
-    logger.debug("New patient inserted: " + QString().setNum(dbPatientID));
-    qDebug() << "New patient inserted as : " << dbPatientID;
+    logger.debug("New patient inserted: database item ID = " + QString().setNum(dbPatientID));
     return true;
   }
 }
@@ -840,12 +850,18 @@ bool ctkDICOMDatabasePrivate::uidsForDataSet(const ctkDICOMItem& dataset,
   patientID = dataset.GetElementAsString(DCM_PatientID);
   studyInstanceUID = dataset.GetElementAsString(DCM_StudyInstanceUID);
   seriesInstanceUID = dataset.GetElementAsString(DCM_SeriesInstanceUID);
+  return this->uidsForDataSet(patientsName, patientID, studyInstanceUID);
+}
 
+//------------------------------------------------------------------------------
+bool ctkDICOMDatabasePrivate::uidsForDataSet(QString& patientsName, QString& patientID, QString& studyInstanceUID)
+{
+  Q_Q(ctkDICOMDatabase);
   if (patientID.isEmpty() && !studyInstanceUID.isEmpty())
   {
     // Use study instance uid as patient id if patient id is empty - can happen on anonymized datasets
     // see: http://www.na-mic.org/Bug/view.php?id=2040
-    logger.warn("Patient ID is empty, using studyInstanceUID as patient ID");
+    logger.warn(QString("Patient ID is empty, using studyInstanceUID (%1) as patient ID").arg(studyInstanceUID));
     patientID = studyInstanceUID;
   }
   if (patientsName.isEmpty() && !patientID.isEmpty())
@@ -1080,17 +1096,16 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
 
 
 //------------------------------------------------------------------------------
-int ctkDICOMDatabasePrivate::getDisplayPatientFieldsIndex(QString patientsName, QString patientID, QVector<QMap<QString, QString> > &displayedFieldsVectorPatient)
+QString ctkDICOMDatabasePrivate::getDisplayPatientFieldsKey(const QString& patientID,
+  const QString& patientsName, const QString& patientsBirthDate,
+  QMap<QString, QMap<QString, QString> >& displayedFieldsMapPatient)
 {
+  QString compositeID = this->compositePatientID(patientID, patientsName, patientsBirthDate);
+
   // Look for the patient in the displayed fields cache first
-  for (int patientIndex=0; patientIndex < displayedFieldsVectorPatient.size(); ++patientIndex)
+  if (displayedFieldsMapPatient.find(compositeID) != displayedFieldsMapPatient.end())
   {
-    QMap<QString, QString> currentPatient = displayedFieldsVectorPatient[patientIndex];
-    if ( !currentPatient["PatientID"].compare(patientID)
-      && !currentPatient["PatientsName"].compare(patientsName) )
-    {
-      return patientIndex;
-    }
+    return compositeID;
   }
 
   // Look for the patient in the display database
@@ -1101,7 +1116,7 @@ int ctkDICOMDatabasePrivate::getDisplayPatientFieldsIndex(QString patientsName, 
   if (!displayPatientsQuery.exec())
   {
     logger.error("SQLITE ERROR: " + displayPatientsQuery.lastError().driverText());
-    return -1;
+    return QString();
   }
   if (displayPatientsQuery.size() > 1)
   {
@@ -1115,15 +1130,12 @@ int ctkDICOMDatabasePrivate::getDisplayPatientFieldsIndex(QString patientsName, 
     {
       patientFieldsMap.insert(patientRecord.fieldName(fieldIndex), patientRecord.value(fieldIndex).toString());
     }
-    // The index of the patient represents its UID for this update of the display tables
-    int patientIndex = displayedFieldsVectorPatient.size();
-    patientFieldsMap["PatientIndex"] = patientIndex; // Index as a single UID for internal temporal use
-    displayedFieldsVectorPatient.append(patientFieldsMap);
-    return patientIndex;
+    displayedFieldsMapPatient[compositeID] = patientFieldsMap;
+    return compositeID;
   }
 
   logger.error("Failed to find patient with PatientsName=" + patientsName + " and PatientID=" + patientID);
-  return -1;
+  return QString();
 }
 
 //------------------------------------------------------------------------------
@@ -1211,14 +1223,15 @@ QString ctkDICOMDatabasePrivate::getDisplaySeriesFieldsKey(QString seriesInstanc
 //------------------------------------------------------------------------------
 bool ctkDICOMDatabasePrivate::applyDisplayedFieldsChanges( QMap<QString, QMap<QString, QString> > &displayedFieldsMapSeries,
                                                            QMap<QString, QMap<QString, QString> > &displayedFieldsMapStudy,
-                                                           QVector<QMap<QString, QString> > &displayedFieldsVectorPatient )
+                                                           QMap<QString, QMap<QString, QString> > &displayedFieldsMapPatient)
 {
-  QMap<int, int> patientIndexToPatientUidMap;
+  QMap<QString, int> patientCompositeIdToPatientUidMap;
 
   // Update patient fields
-  for (int patientIndex=0; patientIndex < displayedFieldsVectorPatient.size(); ++patientIndex)
+
+  foreach(QString compositeID, displayedFieldsMapPatient.keys())
   {
-    QMap<QString, QString> currentPatient = displayedFieldsVectorPatient[patientIndex];
+    QMap<QString, QString> currentPatient = displayedFieldsMapPatient[compositeID];
     QSqlQuery displayPatientsQuery(this->Database);
     displayPatientsQuery.prepare( "SELECT * FROM Patients WHERE PatientID=:patientID AND PatientsName=:patientsName ;" );
     displayPatientsQuery.bindValue(":patientID", currentPatient["PatientID"]);
@@ -1234,7 +1247,7 @@ bool ctkDICOMDatabasePrivate::applyDisplayedFieldsChanges( QMap<QString, QMap<QS
       QList<QString> boundValues;
       foreach (QString tagName, currentPatient.keys())
       {
-        if (tagName == "PatientIndex")
+        if (tagName == "PatientCompositeID")
         {
           continue; // Do not write patient index that is only used internally and temporarily
         }
@@ -1262,7 +1275,7 @@ bool ctkDICOMDatabasePrivate::applyDisplayedFieldsChanges( QMap<QString, QMap<QS
       updateDisplayedFieldsUpdatedTimestampStatement.addBindValue(patientUID);
       this->loggedExec(updateDisplayedFieldsUpdatedTimestampStatement);
 
-      patientIndexToPatientUidMap[patientIndex] = patientUID;
+      patientCompositeIdToPatientUidMap[compositeID] = patientUID;
     }
     else
     {
@@ -1289,10 +1302,10 @@ bool ctkDICOMDatabasePrivate::applyDisplayedFieldsChanges( QMap<QString, QMap<QS
       QList<QString> boundValues;
       foreach (QString tagName, currentStudy.keys())
       {
-        if (!tagName.compare("PatientIndex"))
+        if (!tagName.compare("PatientCompositeID"))
         {
           displayStudiesFieldUpdateString.append( "PatientsUID = ? , " );
-          boundValues << QString::number(patientIndexToPatientUidMap[currentStudy["PatientIndex"].toInt()]);
+          boundValues << QString::number(patientCompositeIdToPatientUidMap[currentStudy["PatientCompositeID"]]);
         }
         else
         {
@@ -1420,11 +1433,11 @@ void ctkDICOMDatabasePrivate::setNumberOfSeriesToStudyDisplayedFields(QMap<QStri
 }
 
 //------------------------------------------------------------------------------
-void ctkDICOMDatabasePrivate::setNumberOfStudiesToPatientDisplayedFields(QVector<QMap<QString, QString> > &displayedFieldsVectorPatient)
+void ctkDICOMDatabasePrivate::setNumberOfStudiesToPatientDisplayedFields(QMap<QString, QMap<QString, QString> >& displayedFieldsMapPatient)
 {
-  for (int patientIndex=0; patientIndex<displayedFieldsVectorPatient.size(); ++patientIndex)
+  foreach(QString compositeID, displayedFieldsMapPatient.keys())
   {
-    QMap<QString, QString> displayedFieldsForCurrentPatient = displayedFieldsVectorPatient[patientIndex];
+    QMap<QString, QString> displayedFieldsForCurrentPatient = displayedFieldsMapPatient[compositeID];
     int patientUID = displayedFieldsForCurrentPatient["UID"].toInt();
     QSqlQuery numberOfStudiesQuery(this->Database);
     numberOfStudiesQuery.prepare("SELECT COUNT(*) FROM Studies WHERE PatientsUID = ? ;");
@@ -1439,7 +1452,7 @@ void ctkDICOMDatabasePrivate::setNumberOfStudiesToPatientDisplayedFields(QVector
     int currentNumberOfStudies = numberOfStudiesQuery.value(0).toInt();
 
     displayedFieldsForCurrentPatient["DisplayedNumberOfStudies"] = QString::number(currentNumberOfStudies);
-    displayedFieldsVectorPatient[patientIndex] = displayedFieldsForCurrentPatient;
+    displayedFieldsMapPatient[compositeID] = displayedFieldsForCurrentPatient;
   }
 }
 
@@ -2718,7 +2731,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
   // Populate displayed fields maps from the current display tables
   QMap<QString /*SeriesInstanceUID*/, QMap<QString /*DisplayField*/, QString /*Value*/> > displayedFieldsMapSeries;
   QMap<QString /*StudyInstanceUID*/, QMap<QString /*DisplayField*/, QString /*Value*/> > displayedFieldsMapStudy;
-  QVector<QMap<QString /*DisplayField*/, QString /*Value*/> > displayedFieldsVectorPatient; // The index in the vector is the internal patient UID
+  QMap<QString /*CompositePatientID*/, QMap<QString /*DisplayField*/, QString /*Value*/> > displayedFieldsMapPatient;
 
   d->DisplayedFieldGenerator.setDatabase(this);
 
@@ -2734,16 +2747,23 @@ void ctkDICOMDatabase::updateDisplayedFields()
     this->getCachedTags(sopInstanceUID, cachedTags);
 
     // Patient
-    int displayedFieldsIndexForCurrentPatient = d->getDisplayPatientFieldsIndex(
-      cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientName)],
-      cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientID)],
-      displayedFieldsVectorPatient );
-    if (displayedFieldsIndexForCurrentPatient < 0)
+    QString patientsName = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientName)];
+    QString patientID = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientID)];
+    QString studyInstanceUID = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_StudyInstanceUID)];
+    if (!d->uidsForDataSet(patientsName, patientID, studyInstanceUID))
+    {
+      // error occurred, message is already logged
+      continue;
+    }
+    QString patientsBirthDate = cachedTags[ctkDICOMItem::TagKeyStripped(DCM_PatientBirthDate)];
+
+    QString compositeId = d->getDisplayPatientFieldsKey(patientID, patientsName, patientsBirthDate, displayedFieldsMapPatient);
+    if (compositeId.isEmpty())
     {
       logger.error("Failed to find patient for SOP Instance UID = " + sopInstanceUID);
       continue;
     }
-    QMap<QString, QString> displayedFieldsForCurrentPatient = displayedFieldsVectorPatient[ displayedFieldsIndexForCurrentPatient ];
+    QMap<QString, QString> displayedFieldsForCurrentPatient = displayedFieldsMapPatient[compositeId];
 
     // Study
     QString displayedFieldsKeyForCurrentStudy = d->getDisplayStudyFieldsKey(
@@ -2755,7 +2775,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
       continue;
     }
     QMap<QString, QString> displayedFieldsForCurrentStudy = displayedFieldsMapStudy[ displayedFieldsKeyForCurrentStudy ];
-    displayedFieldsForCurrentStudy["PatientIndex"] = QString::number(displayedFieldsIndexForCurrentPatient);
+    displayedFieldsForCurrentStudy["PatientCompositeID"] = compositeId;
 
     // Series
     QString displayedFieldsKeyForCurrentSeries = d->getDisplaySeriesFieldsKey(
@@ -2775,7 +2795,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
     // Set updated fields to the series / study / patient displayed fields maps
     displayedFieldsMapSeries[ displayedFieldsKeyForCurrentSeries ] = displayedFieldsForCurrentSeries;
     displayedFieldsMapStudy[ displayedFieldsKeyForCurrentStudy ] = displayedFieldsForCurrentStudy;
-    displayedFieldsVectorPatient[ displayedFieldsIndexForCurrentPatient ] = displayedFieldsForCurrentPatient;
+    displayedFieldsMapPatient[ compositeId ] = displayedFieldsForCurrentPatient;
   } // For each instance
 
   emit displayedFieldsUpdateProgress(++progressValue);
@@ -2788,7 +2808,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
   // Calculate number of series in each updated study
   d->setNumberOfSeriesToStudyDisplayedFields(displayedFieldsMapStudy);
   // Calculate number of studies in each updated patient
-  d->setNumberOfStudiesToPatientDisplayedFields(displayedFieldsVectorPatient);
+  d->setNumberOfStudiesToPatientDisplayedFields(displayedFieldsMapPatient);
 
   emit displayedFieldsUpdateProgress(++progressValue);
 
@@ -2797,7 +2817,7 @@ void ctkDICOMDatabase::updateDisplayedFields()
   {
     d->Database.transaction();
 
-    if (d->applyDisplayedFieldsChanges(displayedFieldsMapSeries, displayedFieldsMapStudy, displayedFieldsVectorPatient))
+    if (d->applyDisplayedFieldsChanges(displayedFieldsMapSeries, displayedFieldsMapStudy, displayedFieldsMapPatient))
     {
       // Update image timestamp
       newFilesQuery.first();

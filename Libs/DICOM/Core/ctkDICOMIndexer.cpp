@@ -387,7 +387,7 @@ ctkDICOMDatabase* ctkDICOMIndexer::database()
  void ctkDICOMIndexer::addFile(ctkDICOMDatabase* db, const QString filePath, bool copyFile/*=false*/)
  {
    this->setDatabase(db);
-   this->addDirectory(filePath, copyFile);
+   this->addFile(filePath, copyFile);
  }
  
 //------------------------------------------------------------------------------
