@@ -250,10 +250,18 @@ public:
   Q_INVOKABLE bool fileExistsAndUpToDate(const QString& filePath);
 
   /// Remove the series from the database, including images and thumbnails
-  Q_INVOKABLE bool removeSeries(const QString& seriesInstanceUID);
+  /// If clearCachedTags is set to true then cached tags associated with the series are deleted,
+  /// if set to False the they are left in the database unchanced.
+  /// By default clearCachedTags is disabled because it significantly increases deletion time
+  /// on large databases.
+  Q_INVOKABLE bool removeSeries(const QString& seriesInstanceUID, bool clearCachedTags=false);
   Q_INVOKABLE bool removeStudy(const QString& studyInstanceUID);
   Q_INVOKABLE bool removePatient(const QString& patientID);
-  Q_INVOKABLE bool cleanup();
+  /// Remove all patients, studies, series, which do not have associated images.
+  /// If vacuum is set to true then the whole database content is attempted to
+  /// cleaned from remnants of all previously deleted data from the file.
+  /// Vacuuming may fail if there are multiple connections to the database.
+  Q_INVOKABLE bool cleanup(bool vacuum=false);
 
   /// \brief Access element values for given instance
   /// @param sopInstanceUID A string with the uid for a given instance
@@ -291,6 +299,8 @@ public:
   Q_INVOKABLE bool cacheTag (const QString sopInstanceUID, const QString tag, const QString value);
   /// Insert lists of tags into the cache as a batch query operation
   Q_INVOKABLE bool cacheTags (const QStringList sopInstanceUIDs, const QStringList tags, const QStringList values);
+  /// Remove all tags corresponding to a SOP instance UID
+  void removeCachedTags(const QString sopInstanceUID);
 
   /// Get displayed name of a given field
   Q_INVOKABLE QString displayedNameForField(QString table, QString field) const;

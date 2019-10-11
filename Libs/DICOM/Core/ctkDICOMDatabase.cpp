@@ -613,13 +613,6 @@ bool ctkDICOMDatabasePrivate::openTagCacheDatabase()
   pragmaSyncQuery.exec("PRAGMA synchronous = OFF");
   pragmaSyncQuery.finish();
 
-  //this work on my pc too
-  this->TagCacheDatabase.exec("PRAGMA journal_mode = MEMORY");
-  if (this->TagCacheDatabase.lastError().isValid())
-  {
-    qDebug() << "journal_mode = MEMORY : " << this->TagCacheDatabase.lastError();
-  }
-
   return true;
 }
 
@@ -1510,12 +1503,6 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
   pragmaSyncQuery.exec("PRAGMA synchronous = OFF");
   pragmaSyncQuery.finish();
 
-  d->Database.exec("PRAGMA journal_mode = MEMORY");
-  if (d->Database.lastError().isValid())
-  {
-    qDebug() << "journal_mode = MEMORY : " << d->Database.lastError();
-  }
-
   if ( d->Database.tables().empty() )
   {
     if (!this->initializeDatabase())
@@ -2382,14 +2369,14 @@ bool ctkDICOMDatabase::isInMemory() const
 }
 
 //------------------------------------------------------------------------------
-bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
+bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID, bool clearCachedTags/*=true*/)
 {
   Q_D(ctkDICOMDatabase);
 
   // get all images from series
-  QSqlQuery fileExistsQuery ( d->Database );
+  QSqlQuery fileExistsQuery(d->Database);
   fileExistsQuery.prepare("SELECT Filename, SOPInstanceUID, StudyInstanceUID FROM Images,Series WHERE Series.SeriesInstanceUID = Images.SeriesInstanceUID AND Images.SeriesInstanceUID = :seriesID");
-  fileExistsQuery.bindValue(":seriesID",seriesInstanceUID);
+  fileExistsQuery.bindValue(":seriesID", seriesInstanceUID);
   bool success = fileExistsQuery.exec();
   if (!success)
   {
@@ -2397,19 +2384,24 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
     return false;
   }
 
-  QList< QPair<QString,QString> > removeList;
-  while ( fileExistsQuery.next() )
+  QList< QPair<QString, QString> > removeList;
+  QStringList removeTagCacheSOPInstanceUIDs;
+  while (fileExistsQuery.next())
   {
     QString dbFilePath = fileExistsQuery.value(fileExistsQuery.record().indexOf("Filename")).toString();
     QString sopInstanceUID = fileExistsQuery.value(fileExistsQuery.record().indexOf("SOPInstanceUID")).toString();
     QString studyInstanceUID = fileExistsQuery.value(fileExistsQuery.record().indexOf("StudyInstanceUID")).toString();
     QString internalFilePath = studyInstanceUID + "/" + seriesInstanceUID + "/" + sopInstanceUID;
-    removeList << qMakePair(dbFilePath,internalFilePath);
+    removeList << qMakePair(dbFilePath, internalFilePath);
+    if (clearCachedTags)
+    {
+      removeTagCacheSOPInstanceUIDs << sopInstanceUID;
+    }
   }
 
-  QSqlQuery fileRemove ( d->Database );
+  QSqlQuery fileRemove(d->Database);
   fileRemove.prepare("DELETE FROM Images WHERE SeriesInstanceUID == :seriesID");
-  fileRemove.bindValue(":seriesID",seriesInstanceUID);
+  fileRemove.bindValue(":seriesID", seriesInstanceUID);
   logger.debug("SQLITE: removing seriesInstanceUID " + seriesInstanceUID);
   success = fileRemove.exec();
   if (!success)
@@ -2418,7 +2410,19 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
     logger.error("SQLITE ERROR: " + fileRemove.lastError().driverText());
   }
 
+  if (!removeTagCacheSOPInstanceUIDs.isEmpty())
+  {
+    d->TagCacheDatabase.transaction();
+    // Remove values from tag cache (may be important for patient confidentiality)
+    foreach(QString sopInstanceUID, removeTagCacheSOPInstanceUIDs)
+    {
+      removeCachedTags(sopInstanceUID);
+    }
+    d->TagCacheDatabase.commit();
+  }
+
   QPair<QString,QString> fileToRemove;
+  QStringList foldersToRemove;
   foreach (fileToRemove, removeList)
   {
     QString dbFilePath = fileToRemove.first;
@@ -2429,7 +2433,7 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
     {
       if (!dbFilePath.endsWith(fileToRemove.second))
       {
-        logger.error("Database inconsistency detected during delete!");
+        logger.error("Database inconsistency detected during delete (stored file found ouside database folder)");
         continue;
       }
       if (QFile( dbFilePath ).remove())
@@ -2437,6 +2441,11 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
         if (d->LoggedExecVerbose)
         {
           logger.debug("Removed file " + dbFilePath );
+        }
+        QString fileFolder = QFileInfo(dbFilePath).absoluteDir().path();
+        if (foldersToRemove.isEmpty() || foldersToRemove.last() != fileFolder)
+        {
+          foldersToRemove << fileFolder;
         }
       }
       else
@@ -2452,7 +2461,18 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
       {
       logger.warn("Failed to remove thumbnail " + thumbnailToRemove);
       }
+      QString fileFolder = QFileInfo(thumbnailFile).absoluteDir().path();
+      if (foldersToRemove.isEmpty() || foldersToRemove.last() != fileFolder)
+      {
+        foldersToRemove << fileFolder;
+      }
     }
+  }
+
+  // Delete all empty folders that are left after removing DICOM files
+  foreach (QString folderToRemove, foldersToRemove)
+  {
+    QDir().rmpath(folderToRemove);
   }
 
   this->cleanup();
@@ -2463,14 +2483,19 @@ bool ctkDICOMDatabase::removeSeries(const QString& seriesInstanceUID)
 }
 
 //------------------------------------------------------------------------------
-bool ctkDICOMDatabase::cleanup()
+bool ctkDICOMDatabase::cleanup(bool vacuum/*=false*/)
 {
   Q_D(ctkDICOMDatabase);
   QSqlQuery seriesCleanup ( d->Database );
   seriesCleanup.exec("DELETE FROM Series WHERE ( SELECT COUNT(*) FROM Images WHERE Images.SeriesInstanceUID = Series.SeriesInstanceUID ) = 0;");
   seriesCleanup.exec("DELETE FROM Studies WHERE ( SELECT COUNT(*) FROM Series WHERE Series.StudyInstanceUID = Studies.StudyInstanceUID ) = 0;");
   seriesCleanup.exec("DELETE FROM Patients WHERE ( SELECT COUNT(*) FROM Studies WHERE Studies.PatientsUID = Patients.UID ) = 0;");
-
+  if (vacuum)
+  {
+    seriesCleanup.exec("VACUUM;");
+    QSqlQuery tagcacheCleanup(d->TagCacheDatabase);
+    seriesCleanup.exec("VACUUM;");
+  }
   return true;
 }
 
@@ -2716,6 +2741,24 @@ bool ctkDICOMDatabase::cacheTags(const QStringList sopInstanceUIDs, const QStrin
   d->TagCacheDatabase.commit();
 
   return success;
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabase::removeCachedTags(const QString sopInstanceUID)
+{
+  Q_D(ctkDICOMDatabase);
+  if (!this->tagCacheExists())
+  {
+    return;
+  }
+  QSqlQuery deleteFile(d->TagCacheDatabase);
+  deleteFile.prepare("DELETE FROM TagCache WHERE SOPInstanceUID == :sopInstanceUID");
+  deleteFile.bindValue(":sopInstanceUID", sopInstanceUID);
+  bool success = deleteFile.exec();
+  if (!success)
+  {
+    logger.error("SQLITE ERROR deleting tag cache row: " + deleteFile.lastError().driverText());
+  }
 }
 
 //------------------------------------------------------------------------------

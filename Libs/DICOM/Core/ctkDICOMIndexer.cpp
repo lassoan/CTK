@@ -64,6 +64,9 @@ ctkDICOMIndexerPrivateWorker::ctkDICOMIndexerPrivateWorker(DICOMIndexingQueue* q
 : RequestQueue(queue)
 , RemainingRequestCount(0)
 , CompletedRequestCount(0)
+, TimePercentageIndexing(80.0)
+, TimePercentageDatabaseInsert(15.0)
+, TimePercentageDatabaseDisplayFieldsUpdate(5.0)
 {
 }
 
@@ -129,8 +132,7 @@ void ctkDICOMIndexerPrivateWorker::processIndexingRequest(DICOMIndexingQueue::In
   int lastReportedPercent = 0;
   foreach(const QString& filePath, indexingRequest.inputFilesPath)
   {
-    // report 0->90% progress for DICOM file parsing
-    int percent = int(90.0 * (this->CompletedRequestCount + double(currentFileIndex++) / double(indexingRequest.inputFilesPath.size()))
+    int percent = int(this->TimePercentageIndexing * (this->CompletedRequestCount + double(currentFileIndex++) / double(indexingRequest.inputFilesPath.size()))
       / double(this->CompletedRequestCount + this->RemainingRequestCount + 1));
     emit this->progress(percent);
     emit progressDetail(filePath);
@@ -183,61 +185,52 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
   int seriesAdded = 0;
   int imagesAdded = 0;
 
-  ctkDICOMDatabase DICOMDatabase;
+  ctkDICOMDatabase database;
+  QObject::connect(&database, SIGNAL(instanceAdded(QString)), this, SLOT(databaseFileInstanceAdded()));
+  QObject::connect(&database, SIGNAL(displayedFieldsUpdateProgress(int)), this, SLOT(databaseDisplayFieldUpdateProgress(int)));
+
   if (!indexingResults.isEmpty())
   {
     emit progressDetail("");
     emit progressStep("Updating database fields");
 
     // Activate batch update
-    emit progress(90);
+    emit progress(this->TimePercentageDatabaseInsert);
     emit updatingDatabase(true);
 
     QTime timeProbe;
     timeProbe.start();
 
-    DICOMDatabase.openDatabase(this->RequestQueue->databaseFilename());
-    DICOMDatabase.setTagsToPrecache(this->RequestQueue->tagsToPrecache());
+    database.openDatabase(this->RequestQueue->databaseFilename());
+    database.setTagsToPrecache(this->RequestQueue->tagsToPrecache());
 
-    int patientsCount = DICOMDatabase.patientsCount();
-    int studiesCount = DICOMDatabase.studiesCount();
-    int seriesCount = DICOMDatabase.seriesCount();
-    int imagesCount = DICOMDatabase.imagesCount();
+    int patientsCount = database.patientsCount();
+    int studiesCount = database.studiesCount();
+    int seriesCount = database.seriesCount();
+    int imagesCount = database.imagesCount();
 
-    static bool batch = true;
-    if (batch)
-    {
-      DICOMDatabase.insert(indexingResults);
-    }
-    else
-    {
-      DICOMDatabase.prepareInsert();
-      foreach(const ctkDICOMDatabase::IndexingResult & indexingResult, indexingResults)
-      {
-        const ctkDICOMItem& ctkDataset = *indexingResult.dataset.data();
-        QString filePath = indexingResult.filePath;
-        bool generateThumbnail = false;
-        bool storeFile = indexingResult.copyFile;
-        DICOMDatabase.insert(indexingResult.filePath, *indexingResult.dataset.data(), indexingResult.copyFile, false);
-      }
-    }
+    this->NumberOfInstancesToInsert = indexingResults.size();
+    this->NumberOfInstancesInserted = 0;
+    database.insert(indexingResults);
+    this->NumberOfInstancesToInsert = 0;
+    this->NumberOfInstancesInserted = 0;
 
-    patientsAdded = DICOMDatabase.patientsCount() - patientsCount;
-    studiesAdded = DICOMDatabase.studiesCount() - studiesCount;
-    seriesAdded = DICOMDatabase.seriesCount() - seriesCount;
-    imagesAdded = DICOMDatabase.imagesCount() - imagesCount;
+    patientsAdded = database.patientsCount() - patientsCount;
+    studiesAdded = database.studiesCount() - studiesCount;
+    seriesAdded = database.seriesCount() - seriesCount;
+    imagesAdded = database.imagesCount() - imagesCount;
 
     float elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
     qDebug() << QString("DICOM indexer has successfully inserted %1 files [%2s]")
       .arg(indexingResults.count()).arg(QString::number(elapsedTimeInSeconds, 'f', 2));
 
     // Update displayed fields according to inserted DICOM datasets
-    emit progress(95);
+    emit progress(this->TimePercentageIndexing+this->TimePercentageDatabaseInsert);
     emit progressStep("Updating database displayed fields");
 
     timeProbe.start();
 
-    DICOMDatabase.updateDisplayedFields();
+    database.updateDisplayedFields();
 
     elapsedTimeInSeconds = timeProbe.elapsed() / 1000.0;
     qDebug() << QString("DICOM indexer has updated display fields for %1 files [%2s]")
@@ -246,7 +239,29 @@ void ctkDICOMIndexerPrivateWorker::writeIndexingResultsToDatabase()
     emit updatingDatabase(false);
   }
 
+  QObject::disconnect(&database, SIGNAL(tagsToPrecacheChanged()), this, SLOT(databaseFileInstanceAdded()));
+  QObject::disconnect(&database, SIGNAL(displayedFieldsUpdateProgress(int)), this, SLOT(databaseDisplayFieldUpdateProgress(int)));
+
   emit indexingComplete(patientsAdded, studiesAdded, seriesAdded, imagesAdded);
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMIndexerPrivateWorker::databaseFileInstanceAdded()
+{
+  if (this->NumberOfInstancesToInsert < 1)
+  {
+    return;
+  }
+  this->NumberOfInstancesInserted++;
+  emit progress(int(this->TimePercentageIndexing
+    + this->TimePercentageDatabaseInsert * double(this->NumberOfInstancesInserted) / double(this->NumberOfInstancesToInsert)));
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMIndexerPrivateWorker::databaseDisplayFieldUpdateProgress(int progressValue)
+{
+  emit progress(int(this->TimePercentageIndexing + this->TimePercentageDatabaseInsert
+    + this->TimePercentageDatabaseDisplayFieldsUpdate * double(progressValue) / 5.0));
 }
 
 //------------------------------------------------------------------------------

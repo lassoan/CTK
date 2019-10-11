@@ -177,6 +177,8 @@ public:
 
 public Q_SLOTS:
   void start();
+  void databaseFileInstanceAdded();
+  void databaseDisplayFieldUpdateProgress(int);
 
 Q_SIGNALS:
   void progress(int);
@@ -191,6 +193,12 @@ private:
   void writeIndexingResultsToDatabase();
 
   DICOMIndexingQueue* RequestQueue;
+  int NumberOfInstancesToInsert;
+  int NumberOfInstancesInserted;
+
+  double TimePercentageIndexing;
+  double TimePercentageDatabaseInsert;
+  double TimePercentageDatabaseDisplayFieldsUpdate;
 
   int RemainingRequestCount; // the current request in progress is not included
   int CompletedRequestCount; // the current request in progress is not included

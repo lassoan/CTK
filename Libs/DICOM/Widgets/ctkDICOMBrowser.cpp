@@ -836,6 +836,9 @@ void ctkDICOMBrowser::onRepairAction()
     d->DICOMDatabase->updateDisplayedFields();
     d->dicomTableManager->setBatchUpdate(wasBatchUpdate);
   }
+
+  // Force refresh of table views
+  d->DICOMDatabase->databaseChanged();
 }
 
 //----------------------------------------------------------------------------
