@@ -30,7 +30,8 @@
 // CTK includes
 #include "ctkVTKSliceView.h"
 #include "ctkVTKAbstractView_p.h"
-#include <vtkLightBoxRendererManager.h>
+//#include <vtkLightBoxRendererManager.h>
+#include "vtkImageMapper.h"
 
 // VTK includes
 #include <vtkRenderer.h>
@@ -51,11 +52,14 @@ public:
   void setupCornerAnnotation();
   void setupRendering();
 
-  vtkSmartPointer<vtkLightBoxRendererManager>   LightBoxRendererManager;
+  //vtkSmartPointer<vtkLightBoxRendererManager>   LightBoxRendererManager;
   bool                                          RenderPending;
   bool                                          RenderEnabled;
-  vtkSmartPointer<vtkRenderer>                  OverlayRenderer;
-  vtkSmartPointer<vtkCornerAnnotation>          OverlayCornerAnnotation;
+  vtkSmartPointer<vtkRenderer>                  ImageRenderer;
+  vtkSmartPointer<vtkImageMapper> ImageMapper;
+  vtkSmartPointer<vtkActor2D> ImageActor;
+  //vtkSmartPointer<vtkRenderer>                  OverlayRenderer;
+  //vtkSmartPointer<vtkCornerAnnotation>          OverlayCornerAnnotation;
 
 };
 

@@ -60,22 +60,22 @@ class RenderWindowItem
 {
 public:
   RenderWindowItem(const double rendererBackgroundColor[3], const double highlightedBoxColor[3],
-                   double colorWindow, double colorLevel);
+                   double colorWindow, double colorLevel, vtkRenderer* renderer);
   ~RenderWindowItem();
   void SetViewport(double xMin, double yMin, double viewportWidth, double viewportHeight);
 
   /// Create the actor supporing the image mapper
   void SetupImageMapperActor(double colorWindow, double colorLevel);
 
-  /// Create a box around the renderer.
+  /*/// Create a box around the renderer.
   void SetupHighlightedBoxActor(const double highlightedBoxColor[3], bool visible = false);
 
   /// Set HighlightedBox color
-  void SetHighlightedBoxColor(double* newHighlightedBoxColor);
+  void SetHighlightedBoxColor(double* newHighlightedBoxColor);*/
 
   vtkSmartPointer<vtkRenderer>                Renderer;
   vtkSmartPointer<vtkImageMapper>             ImageMapper;
-  vtkSmartPointer<vtkActor2D>                 HighlightedBoxActor;
+  //vtkSmartPointer<vtkActor2D>                 HighlightedBoxActor;
   vtkSmartPointer<vtkActor2D>                 ImageActor;
 };
 }
@@ -86,21 +86,21 @@ public:
 //-----------------------------------------------------------------------------
 RenderWindowItem::RenderWindowItem(const double rendererBackgroundColor[3],
                                    const double highlightedBoxColor[3],
-                                   double colorWindow, double colorLevel)
+                                   double colorWindow, double colorLevel, vtkRenderer* renderer)
 {
   // Instantiate a renderer
-  this->Renderer = vtkSmartPointer<vtkRenderer>::New();
-  this->Renderer->SetBackground(rendererBackgroundColor[0],
-                                rendererBackgroundColor[1],
-                                rendererBackgroundColor[2]);
+  this->Renderer = renderer;
+  //this->Renderer->SetBackground(rendererBackgroundColor[0],
+  //                              rendererBackgroundColor[1],
+  //                              rendererBackgroundColor[2]);
 
   // Ensure a vtkCamera is created and associated with the renderer
   // This is particularly important to ensure WorldToView/ViewToWorld
   // work as expected.
-  this->Renderer->GetActiveCamera();
+  //this->Renderer->GetActiveCamera();
 
   this->SetupImageMapperActor(colorWindow, colorLevel);
-  this->SetupHighlightedBoxActor(highlightedBoxColor);
+  //this->SetupHighlightedBoxActor(highlightedBoxColor);
 }
 
 //-----------------------------------------------------------------------------
@@ -113,14 +113,14 @@ RenderWindowItem::~RenderWindowItem()
 void RenderWindowItem::SetViewport(double xMin, double yMin,
                                    double viewportWidth, double viewportHeight)
 {
-  assert(this->Renderer);
-  this->Renderer->SetViewport( xMin, yMin, (xMin + viewportWidth), (yMin + viewportHeight));
+  //assert(this->Renderer);
+  //this->Renderer->SetViewport( xMin, yMin, (xMin + viewportWidth), (yMin + viewportHeight));
 }
 
 //---------------------------------------------------------------------------
 void RenderWindowItem::SetupImageMapperActor(double colorWindow, double colorLevel)
 {
-  assert(this->Renderer);
+  //assert(this->Renderer);
   assert(!this->ImageMapper);
 
   // Instantiate an image mapper
@@ -134,83 +134,83 @@ void RenderWindowItem::SetupImageMapperActor(double colorWindow, double colorLev
   this->ImageActor->GetProperty()->SetDisplayLocationToBackground();
 }
 
-//---------------------------------------------------------------------------
-void RenderWindowItem::SetupHighlightedBoxActor(const double highlightedBoxColor[3], bool visible)
-{
-  assert(this->Renderer);
-  assert(!this->HighlightedBoxActor);
-  
-  // Create a highlight actor (2D box around viewport)
-  vtkNew<vtkPolyData> poly;
-  vtkNew<vtkPoints> points;
-  // Normalized Viewport means :
-  // 0. -> 0;
-  // 1. -> width - 1 ;
-  // For a line of a width of 1, from (0.f,0.f) to (10.f,0.f), the line is on
-  // 2 pixels. What pixel to draw the line on ?
-  //
-  //     |       |       |       |       |       |       |
-  //  1  |       |       |       |       |       |       |
-  //     |       |       |       |       |       |       |
-  //     +-------+-------+-------+-------+-------+-------+
-  //     |       |       |       |       |       |       |
-  //  0  | What pixel    |================================
-  //     | line shall    |
-  //     +--be drawn---(0,0)
-  //     |  above or     |
-  // -1  |   below?      |================================
-  //     |       |       |       |       |       |       |
-  //  ^  +-------+-------+-------+-------+-------+-------+
-  //     |       |       |       |       |       |       |
-  // 1px |       |       |       |       |       |       |
-  //     |       |       |       |       |       |       |
-  //  V  +-------+-------+-------+-------+-------+-------+
-  //     <  1px  >  -1       0       1       2       3
-  // It depends of the graphic card, this is why we need to add an offset.
-  // 0.0002 seems to work for most of the window sizes.
-  double shift = 0.0002;
-  points->InsertNextPoint(0. + shift, 0. + shift, 0); // bottom-left
-  points->InsertNextPoint(1. + shift, 0. + shift, 0); // bottom-right
-  points->InsertNextPoint(1. + shift, 1. + shift + 0.1, 0); // top-right to fill the 1,1 pixel
-  points->InsertNextPoint(1. + shift, 1. + shift, 0); // top-right
-  points->InsertNextPoint(0. + shift, 1. + shift, 0); // top-left
-  points->InsertNextPoint(0. + shift, 0. + shift - 0.1, 0); // bottom-left to fill the 0,0 pixel.
-  
-  vtkNew<vtkCellArray> cells;
-  cells->InsertNextCell(6);
-  cells->InsertCellPoint(0);
-  cells->InsertCellPoint(1);
-  cells->InsertCellPoint(2);
-  cells->InsertCellPoint(3);
-  cells->InsertCellPoint(4);
-  cells->InsertCellPoint(5);
-  poly->SetPoints(points.GetPointer());
-  poly->SetLines(cells.GetPointer());
-
-  vtkNew<vtkCoordinate> coordinate;
-  coordinate->SetCoordinateSystemToNormalizedViewport();
-  coordinate->SetViewport(this->Renderer);
-
-  vtkNew<vtkPolyDataMapper2D> polyDataMapper;
-  polyDataMapper->SetInputData(poly.GetPointer());
-  polyDataMapper->SetTransformCoordinate(coordinate.GetPointer());
-  polyDataMapper->SetTransformCoordinateUseDouble(true);
-
-  this->HighlightedBoxActor = vtkSmartPointer<vtkActor2D>::New();
-  this->HighlightedBoxActor->SetMapper(polyDataMapper.GetPointer());
-  this->HighlightedBoxActor->GetProperty()->SetColor(highlightedBoxColor[0],
-                                                     highlightedBoxColor[1],
-                                                     highlightedBoxColor[2]);
-  this->HighlightedBoxActor->GetProperty()->SetDisplayLocationToForeground();
-  this->HighlightedBoxActor->GetProperty()->SetLineWidth(1.0f);
-  this->HighlightedBoxActor->SetVisibility(visible);
-}
-
-//-----------------------------------------------------------------------------
-void RenderWindowItem::SetHighlightedBoxColor(double* newHighlightedBoxColor)
-{
-  this->HighlightedBoxActor->GetProperty()->SetColor(newHighlightedBoxColor);
-}
+////---------------------------------------------------------------------------
+//void RenderWindowItem::SetupHighlightedBoxActor(const double highlightedBoxColor[3], bool visible)
+//{
+//  assert(this->Renderer);
+//  assert(!this->HighlightedBoxActor);
+//  
+//  // Create a highlight actor (2D box around viewport)
+//  vtkNew<vtkPolyData> poly;
+//  vtkNew<vtkPoints> points;
+//  // Normalized Viewport means :
+//  // 0. -> 0;
+//  // 1. -> width - 1 ;
+//  // For a line of a width of 1, from (0.f,0.f) to (10.f,0.f), the line is on
+//  // 2 pixels. What pixel to draw the line on ?
+//  //
+//  //     |       |       |       |       |       |       |
+//  //  1  |       |       |       |       |       |       |
+//  //     |       |       |       |       |       |       |
+//  //     +-------+-------+-------+-------+-------+-------+
+//  //     |       |       |       |       |       |       |
+//  //  0  | What pixel    |================================
+//  //     | line shall    |
+//  //     +--be drawn---(0,0)
+//  //     |  above or     |
+//  // -1  |   below?      |================================
+//  //     |       |       |       |       |       |       |
+//  //  ^  +-------+-------+-------+-------+-------+-------+
+//  //     |       |       |       |       |       |       |
+//  // 1px |       |       |       |       |       |       |
+//  //     |       |       |       |       |       |       |
+//  //  V  +-------+-------+-------+-------+-------+-------+
+//  //     <  1px  >  -1       0       1       2       3
+//  // It depends of the graphic card, this is why we need to add an offset.
+//  // 0.0002 seems to work for most of the window sizes.
+//  double shift = 0.0002;
+//  points->InsertNextPoint(0. + shift, 0. + shift, 0); // bottom-left
+//  points->InsertNextPoint(1. + shift, 0. + shift, 0); // bottom-right
+//  points->InsertNextPoint(1. + shift, 1. + shift + 0.1, 0); // top-right to fill the 1,1 pixel
+//  points->InsertNextPoint(1. + shift, 1. + shift, 0); // top-right
+//  points->InsertNextPoint(0. + shift, 1. + shift, 0); // top-left
+//  points->InsertNextPoint(0. + shift, 0. + shift - 0.1, 0); // bottom-left to fill the 0,0 pixel.
+//  
+//  vtkNew<vtkCellArray> cells;
+//  cells->InsertNextCell(6);
+//  cells->InsertCellPoint(0);
+//  cells->InsertCellPoint(1);
+//  cells->InsertCellPoint(2);
+//  cells->InsertCellPoint(3);
+//  cells->InsertCellPoint(4);
+//  cells->InsertCellPoint(5);
+//  poly->SetPoints(points.GetPointer());
+//  poly->SetLines(cells.GetPointer());
+//
+//  vtkNew<vtkCoordinate> coordinate;
+//  coordinate->SetCoordinateSystemToNormalizedViewport();
+//  coordinate->SetViewport(this->Renderer);
+//
+//  vtkNew<vtkPolyDataMapper2D> polyDataMapper;
+//  polyDataMapper->SetInputData(poly.GetPointer());
+//  polyDataMapper->SetTransformCoordinate(coordinate.GetPointer());
+//  polyDataMapper->SetTransformCoordinateUseDouble(true);
+//
+//  this->HighlightedBoxActor = vtkSmartPointer<vtkActor2D>::New();
+//  this->HighlightedBoxActor->SetMapper(polyDataMapper.GetPointer());
+//  this->HighlightedBoxActor->GetProperty()->SetColor(highlightedBoxColor[0],
+//                                                     highlightedBoxColor[1],
+//                                                     highlightedBoxColor[2]);
+//  this->HighlightedBoxActor->GetProperty()->SetDisplayLocationToForeground();
+//  this->HighlightedBoxActor->GetProperty()->SetLineWidth(1.0f);
+//  this->HighlightedBoxActor->SetVisibility(visible);
+//}
+//
+////-----------------------------------------------------------------------------
+//void RenderWindowItem::SetHighlightedBoxColor(double* newHighlightedBoxColor)
+//{
+//  this->HighlightedBoxActor->GetProperty()->SetColor(newHighlightedBoxColor);
+//}
 
 //-----------------------------------------------------------------------------
 // vtkInternal
@@ -296,18 +296,18 @@ vtkLightBoxRendererManager::vtkInternal::~vtkInternal()
 // --------------------------------------------------------------------------
 void vtkLightBoxRendererManager::vtkInternal::SetupCornerAnnotation()
 {
-  for(RenderWindowItemListIt it = this->RenderWindowItemList.begin();
-      it != this->RenderWindowItemList.end();
-      ++it)
-    {
-    if (!(*it)->Renderer->HasViewProp(this->CornerAnnotation))
-      {
-      (*it)->Renderer->AddViewProp(this->CornerAnnotation);
-      }
-    }
+  //for(RenderWindowItemListIt it = this->RenderWindowItemList.begin();
+  //    it != this->RenderWindowItemList.end();
+  //    ++it)
+  //  {
+  //  if (!(*it)->Renderer->HasViewProp(this->CornerAnnotation))
+  //    {
+  //    (*it)->Renderer->AddViewProp(this->CornerAnnotation);
+  //    }
+  //  }
 
-  this->CornerAnnotation->ClearAllTexts();
-  this->CornerAnnotation->SetText(2, this->CornerAnnotationText.c_str());
+  //this->CornerAnnotation->ClearAllTexts();
+  //this->CornerAnnotation->SetText(2, this->CornerAnnotationText.c_str());
 }
 
 //---------------------------------------------------------------------------
@@ -316,13 +316,13 @@ void vtkLightBoxRendererManager::vtkInternal::setupRendering()
   assert(this->RenderWindow);
   
   // Remove only renderers managed by this light box
-  for(RenderWindowItemListIt it = this->RenderWindowItemList.begin();
+  /*for(RenderWindowItemListIt it = this->RenderWindowItemList.begin();
       it != this->RenderWindowItemList.end();
       ++it)
     {
     this->RenderWindow->GetRenderers()->RemoveItem((*it)->Renderer);
     }
-
+    */
   // Compute the width and height of each RenderWindowItem
   double viewportWidth  = 1.0 / static_cast<double>(this->RenderWindowColumnCount);
   double viewportHeight = 1.0 / static_cast<double>(this->RenderWindowRowCount);
@@ -347,16 +347,17 @@ void vtkLightBoxRendererManager::vtkInternal::setupRendering()
       item->SetViewport(xMin, yMin, viewportWidth, viewportHeight);
 
       // Add to RenderWindow
-      this->RenderWindow->AddRenderer(item->Renderer);
+      //this->RenderWindow->AddRenderer(item->Renderer);
 
       // Parallel projection is needed to prevent actors from warping/tilting
       // when they are near the edge of the window.
+      /*
       vtkCamera* camera = item->Renderer->GetActiveCamera();
       if (camera)
         {
         camera->ParallelProjectionOn();
         }
-
+        */
       xMin += viewportWidth;
       }
     }
@@ -399,9 +400,9 @@ void vtkLightBoxRendererManager::vtkInternal
   if (!hasViewProp)
     {
     item->ImageActor->SetVisibility(false);
-    item->HighlightedBoxActor->SetVisibility(false);
+    //item->HighlightedBoxActor->SetVisibility(false);
     item->Renderer->AddActor2D(item->ImageActor);
-    item->Renderer->AddActor2D(item->HighlightedBoxActor);
+    //item->Renderer->AddActor2D(item->HighlightedBoxActor);
     }
   item->ImageActor->SetVisibility(this->ImageDataConnection != NULL);
 }
@@ -468,7 +469,7 @@ void vtkLightBoxRendererManager::Initialize(vtkRenderWindow* renderWindow)
   this->Internal->RenderWindow = renderWindow;
 
   // Set default Layout
-  this->SetRenderWindowLayout(1, 1); // Modified() is invoked by SetRenderWindowLayout
+  this->SetRenderWindowLayout(1, 1, this->Internal->RenderWindow->GetRenderers()->GetFirstRenderer()); // Modified() is invoked by SetRenderWindowLayout
 }
 
 //----------------------------------------------------------------------------
@@ -540,6 +541,7 @@ void vtkLightBoxRendererManager::SetActiveCamera(vtkCamera* newActiveCamera)
 
   newActiveCamera->ParallelProjectionOn();
 
+  /*
   vtkInternal::RenderWindowItemListIt it;
   for(it = this->Internal->RenderWindowItemList.begin();
       it != this->Internal->RenderWindowItemList.end();
@@ -547,7 +549,7 @@ void vtkLightBoxRendererManager::SetActiveCamera(vtkCamera* newActiveCamera)
     {
     (*it)->Renderer->SetActiveCamera(newActiveCamera);
     }
-
+    */
   this->Modified();
 }
 
@@ -616,7 +618,7 @@ int vtkLightBoxRendererManager::GetRenderWindowLayoutType() const
 }
 
 //----------------------------------------------------------------------------
-void vtkLightBoxRendererManager::SetRenderWindowLayout(int rowCount, int columnCount)
+void vtkLightBoxRendererManager::SetRenderWindowLayout(int rowCount, int columnCount, vtkRenderer* renderer)
 {
   if (!this->IsInitialized())
     {
@@ -649,8 +651,8 @@ void vtkLightBoxRendererManager::SetRenderWindowLayout(int rowCount, int columnC
       RenderWindowItem * item =
           new RenderWindowItem(this->Internal->RendererBackgroundColor,
                                this->Internal->HighlightedBoxColor,
-                               this->Internal->ColorWindow, this->Internal->ColorLevel);
-      item->Renderer->SetLayer(this->Internal->RendererLayer);
+                               this->Internal->ColorWindow, this->Internal->ColorLevel, renderer);
+      //item->Renderer->SetLayer(this->Internal->RendererLayer);
       this->Internal->SetItemInput(item);
       this->Internal->RenderWindowItemList.push_back(item);
       --extraItem;
@@ -690,7 +692,7 @@ int vtkLightBoxRendererManager::GetRenderWindowRowCount()
 //----------------------------------------------------------------------------
 void vtkLightBoxRendererManager::SetRenderWindowRowCount(int newRowCount)
 {
-  this->SetRenderWindowLayout(newRowCount, this->GetRenderWindowColumnCount());
+  this->SetRenderWindowLayout(newRowCount, this->GetRenderWindowColumnCount(), this->Internal->RenderWindow->GetRenderers()->GetFirstRenderer());
 }
 
 //----------------------------------------------------------------------------
@@ -702,89 +704,89 @@ int vtkLightBoxRendererManager::GetRenderWindowColumnCount()
 //----------------------------------------------------------------------------
 void vtkLightBoxRendererManager::SetRenderWindowColumnCount(int newColumnCount)
 {
-  this->SetRenderWindowLayout(this->GetRenderWindowRowCount(), newColumnCount);
+  this->SetRenderWindowLayout(this->GetRenderWindowRowCount(), newColumnCount, this->Internal->RenderWindow->GetRenderers()->GetFirstRenderer());
 }
 
-//----------------------------------------------------------------------------
-bool vtkLightBoxRendererManager::GetHighlightedById(int id)
-{
-  if (!this->IsInitialized())
-    {
-    vtkErrorMacro(<< "SetHighlightedById failed - vtkLightBoxRendererManager is NOT initialized");
-    return false;
-    }
-  if (id < 0 || id >= static_cast<int>(this->Internal->RenderWindowItemList.size()))
-    {
-    return false;
-    }
-  return this->Internal->RenderWindowItemList.at(id)->HighlightedBoxActor->GetVisibility();
-}
-
-//----------------------------------------------------------------------------
-bool vtkLightBoxRendererManager::GetHighlighted(int rowId, int columnId)
-{
-  return this->GetHighlightedById(this->ComputeRenderWindowItemId(rowId, columnId));
-}
-
-//----------------------------------------------------------------------------
-void vtkLightBoxRendererManager::SetHighlightedById(int id, bool highlighted)
-{
-  if (!this->IsInitialized())
-    {
-    vtkErrorMacro(<< "SetHighlightedById failed - vtkLightBoxRendererManager is NOT initialized");
-    return;
-    }
-  if (id < 0 || id >= static_cast<int>(this->Internal->RenderWindowItemList.size()))
-    {
-    return;
-    }
-  this->Internal->RenderWindowItemList.at(id)->HighlightedBoxActor->SetVisibility(highlighted);
-
-  this->Modified();
-}
-
-//----------------------------------------------------------------------------
-void vtkLightBoxRendererManager::SetHighlighted(int rowId, int columnId, bool highlighted)
-{
-  this->SetHighlightedById(this->ComputeRenderWindowItemId(rowId, columnId), highlighted);
-}
-
-//----------------------------------------------------------------------------
-void vtkLightBoxRendererManager::SetHighlightedBoxColor(double newHighlightedBoxColor[3])
-{
-  if (!this->IsInitialized())
-    {
-    vtkErrorMacro(<< "SetHighlightedById failed - vtkLightBoxRendererManager is NOT initialized");
-    return;
-    }
-
-  if (this->Internal->HighlightedBoxColor[0] == newHighlightedBoxColor[0] &&
-      this->Internal->HighlightedBoxColor[1] == newHighlightedBoxColor[1] &&
-      this->Internal->HighlightedBoxColor[2] == newHighlightedBoxColor[2])
-    {
-    return;
-    }
-
-  this->Internal->HighlightedBoxColor[0] = newHighlightedBoxColor[0];
-  this->Internal->HighlightedBoxColor[1] = newHighlightedBoxColor[1];
-  this->Internal->HighlightedBoxColor[2] = newHighlightedBoxColor[2];
-
-  vtkInternal::RenderWindowItemListIt it;
-  for(it = this->Internal->RenderWindowItemList.begin();
-      it != this->Internal->RenderWindowItemList.end();
-      ++it)
-    {
-    (*it)->SetHighlightedBoxColor(newHighlightedBoxColor);
-    }
-
-  this->Modified();
-}
-
-//----------------------------------------------------------------------------
-double* vtkLightBoxRendererManager::GetHighlightedBoxColor() const
-{
-  return this->Internal->HighlightedBoxColor;
-}
+////----------------------------------------------------------------------------
+//bool vtkLightBoxRendererManager::GetHighlightedById(int id)
+//{
+//  if (!this->IsInitialized())
+//    {
+//    vtkErrorMacro(<< "SetHighlightedById failed - vtkLightBoxRendererManager is NOT initialized");
+//    return false;
+//    }
+//  if (id < 0 || id >= static_cast<int>(this->Internal->RenderWindowItemList.size()))
+//    {
+//    return false;
+//    }
+//  return this->Internal->RenderWindowItemList.at(id)->HighlightedBoxActor->GetVisibility();
+//}
+//
+////----------------------------------------------------------------------------
+//bool vtkLightBoxRendererManager::GetHighlighted(int rowId, int columnId)
+//{
+//  return this->GetHighlightedById(this->ComputeRenderWindowItemId(rowId, columnId));
+//}
+//
+////----------------------------------------------------------------------------
+//void vtkLightBoxRendererManager::SetHighlightedById(int id, bool highlighted)
+//{
+//  if (!this->IsInitialized())
+//    {
+//    vtkErrorMacro(<< "SetHighlightedById failed - vtkLightBoxRendererManager is NOT initialized");
+//    return;
+//    }
+//  if (id < 0 || id >= static_cast<int>(this->Internal->RenderWindowItemList.size()))
+//    {
+//    return;
+//    }
+//  this->Internal->RenderWindowItemList.at(id)->HighlightedBoxActor->SetVisibility(highlighted);
+//
+//  this->Modified();
+//}
+//
+////----------------------------------------------------------------------------
+//void vtkLightBoxRendererManager::SetHighlighted(int rowId, int columnId, bool highlighted)
+//{
+//  this->SetHighlightedById(this->ComputeRenderWindowItemId(rowId, columnId), highlighted);
+//}
+//
+////----------------------------------------------------------------------------
+//void vtkLightBoxRendererManager::SetHighlightedBoxColor(double newHighlightedBoxColor[3])
+//{
+//  if (!this->IsInitialized())
+//    {
+//    vtkErrorMacro(<< "SetHighlightedById failed - vtkLightBoxRendererManager is NOT initialized");
+//    return;
+//    }
+//
+//  if (this->Internal->HighlightedBoxColor[0] == newHighlightedBoxColor[0] &&
+//      this->Internal->HighlightedBoxColor[1] == newHighlightedBoxColor[1] &&
+//      this->Internal->HighlightedBoxColor[2] == newHighlightedBoxColor[2])
+//    {
+//    return;
+//    }
+//
+//  this->Internal->HighlightedBoxColor[0] = newHighlightedBoxColor[0];
+//  this->Internal->HighlightedBoxColor[1] = newHighlightedBoxColor[1];
+//  this->Internal->HighlightedBoxColor[2] = newHighlightedBoxColor[2];
+//
+//  vtkInternal::RenderWindowItemListIt it;
+//  for(it = this->Internal->RenderWindowItemList.begin();
+//      it != this->Internal->RenderWindowItemList.end();
+//      ++it)
+//    {
+//    (*it)->SetHighlightedBoxColor(newHighlightedBoxColor);
+//    }
+//
+//  this->Modified();
+//}
+//
+////----------------------------------------------------------------------------
+//double* vtkLightBoxRendererManager::GetHighlightedBoxColor() const
+//{
+//  return this->Internal->HighlightedBoxColor;
+//}
 
 //----------------------------------------------------------------------------
 int vtkLightBoxRendererManager::ComputeRenderWindowItemId(int rowId, int columnId)
@@ -830,43 +832,43 @@ vtkCornerAnnotation * vtkLightBoxRendererManager::GetCornerAnnotation() const
 // --------------------------------------------------------------------------
 void vtkLightBoxRendererManager::SetCornerAnnotation(vtkCornerAnnotation* annotation)
 {
-  // Remove current corner annotation
-  vtkInternal::RenderWindowItemListIt it;
-  for(it = this->Internal->RenderWindowItemList.begin();
-      it != this->Internal->RenderWindowItemList.end();
-      ++it)
-    {
-    if (!(*it)->Renderer->HasViewProp(this->Internal->CornerAnnotation))
-      {
-      (*it)->Renderer->RemoveViewProp(this->Internal->CornerAnnotation);
-      }
-    }
-  this->Internal->CornerAnnotation = annotation;
+  //// Remove current corner annotation
+  //vtkInternal::RenderWindowItemListIt it;
+  //for(it = this->Internal->RenderWindowItemList.begin();
+  //    it != this->Internal->RenderWindowItemList.end();
+  //    ++it)
+  //  {
+  //  if (!(*it)->Renderer->HasViewProp(this->Internal->CornerAnnotation))
+  //    {
+  //    (*it)->Renderer->RemoveViewProp(this->Internal->CornerAnnotation);
+  //    }
+  //  }
+  //this->Internal->CornerAnnotation = annotation;
 }
 
 // --------------------------------------------------------------------------
 void vtkLightBoxRendererManager::SetBackgroundColor(const double newBackgroundColor[3])
 {
-  if (!this->IsInitialized())
-    {
-    vtkErrorMacro(<< "SetBackgroundColor failed - vtkLightBoxRendererManager is NOT initialized");
-    return;
-    }
-  vtkInternal::RenderWindowItemListIt it;
-  for(it = this->Internal->RenderWindowItemList.begin();
-      it != this->Internal->RenderWindowItemList.end();
-      ++it)
-    {
-    (*it)->Renderer->SetBackground(newBackgroundColor[0],
-                                   newBackgroundColor[1],
-                                   newBackgroundColor[2]);
-    }
+  //if (!this->IsInitialized())
+  //  {
+  //  vtkErrorMacro(<< "SetBackgroundColor failed - vtkLightBoxRendererManager is NOT initialized");
+  //  return;
+  //  }
+  //vtkInternal::RenderWindowItemListIt it;
+  //for(it = this->Internal->RenderWindowItemList.begin();
+  //    it != this->Internal->RenderWindowItemList.end();
+  //    ++it)
+  //  {
+  //  (*it)->Renderer->SetBackground(newBackgroundColor[0],
+  //                                 newBackgroundColor[1],
+  //                                 newBackgroundColor[2]);
+  //  }
 
-  this->Internal->RendererBackgroundColor[0] = newBackgroundColor[0];
-  this->Internal->RendererBackgroundColor[1] = newBackgroundColor[1];
-  this->Internal->RendererBackgroundColor[2] = newBackgroundColor[2];
+  //this->Internal->RendererBackgroundColor[0] = newBackgroundColor[0];
+  //this->Internal->RendererBackgroundColor[1] = newBackgroundColor[1];
+  //this->Internal->RendererBackgroundColor[2] = newBackgroundColor[2];
 
-  this->Modified();
+  //this->Modified();
 }
 
 //----------------------------------------------------------------------------

@@ -32,16 +32,20 @@ class vtkImageData;
 class vtkRenderer;
 class vtkAlgorithmOutput;
 
+class vtkActor2D;
+class vtkImageMapper;
+
+
 /// \ingroup Visualization_VTK_Widgets
 /// Specific implementation for a 2D view that supports lightbox display.
 /// \note There is no support for gradient background yet.
 class CTK_VISUALIZATION_VTK_WIDGETS_EXPORT ctkVTKSliceView : public ctkVTKAbstractView
 {
   Q_OBJECT
-  Q_ENUMS(RenderWindowLayoutType)
-  Q_PROPERTY(RenderWindowLayoutType renderWindowLayoutType
-             READ renderWindowLayoutType WRITE setRenderWindowLayoutType)
-  Q_PROPERTY(QColor highlightedBoxColor READ highlightedBoxColor WRITE setHighlightedBoxColor)
+  //Q_ENUMS(RenderWindowLayoutType)
+  //Q_PROPERTY(RenderWindowLayoutType renderWindowLayoutType
+  //           READ renderWindowLayoutType WRITE setRenderWindowLayoutType)
+  //Q_PROPERTY(QColor highlightedBoxColor READ highlightedBoxColor WRITE setHighlightedBoxColor)
   Q_PROPERTY(double colorLevel READ colorLevel WRITE setColorLevel)
   Q_PROPERTY(double colorWindow READ colorWindow WRITE setColorWindow)
 
@@ -54,20 +58,20 @@ public:
   /// The layout type determines how the image slices should be displayed
   /// within the different render view items.
   /// \sa setRenderWindowLayout() renderWindowLayoutType()
-  enum RenderWindowLayoutType{LeftRightTopBottom = 0, LeftRightBottomTop};
+  //enum RenderWindowLayoutType{LeftRightTopBottom = 0, LeftRightBottomTop};
 
   /// Set active camera
-  void setActiveCamera(vtkCamera * newActiveCamera);
+  //void setActiveCamera(vtkCamera * newActiveCamera);
 
   /// Get lightBoxRendererManager
-  Q_INVOKABLE vtkLightBoxRendererManager* lightBoxRendererManager() const;
+  //Q_INVOKABLE vtkLightBoxRendererManager* lightBoxRendererManager() const;
 
   /// Get overlay renderer
-  vtkRenderer* overlayRenderer() const;
+  //vtkRenderer* overlayRenderer() const;
 
   /// Get overlay corner annotation actor
   /// This corresponds to the cornerAnnotation associated added in the single overlay renderer
-  vtkCornerAnnotation* overlayCornerAnnotation()const;
+  //vtkCornerAnnotation* overlayCornerAnnotation()const;
 
   /// Set background color
   /// \sa vtkLightBoxRendererManager::SetBackgroundColor
@@ -79,11 +83,11 @@ public:
 
   /// Get highlightedBox color
   /// \sa setHighlightedBoxColor();
-  QColor highlightedBoxColor()const;
+  //QColor highlightedBoxColor()const;
 
   /// Get renderWindow layout type
   /// \sa setRenderWindowLayoutType();
-  RenderWindowLayoutType renderWindowLayoutType()const;
+  //RenderWindowLayoutType renderWindowLayoutType()const;
 
   /// Get color level
   /// \sa setColorLevel();
@@ -105,11 +109,11 @@ public Q_SLOTS:
 
   /// Set highlightedBox color
   /// \sa vtkLightBoxRendererManager::SetHighlightedBoxColor
-  void setHighlightedBoxColor(const QColor& newHighlightedBoxColor);
+  //void setHighlightedBoxColor(const QColor& newHighlightedBoxColor);
 
   /// Set RenderWindow layout type
   /// \sa vtkLightBoxRendererManager::SetRenderWindowLayoutType
-  void setRenderWindowLayoutType(RenderWindowLayoutType layoutType);
+  //void setRenderWindowLayoutType(RenderWindowLayoutType layoutType);
 
   /// Set color level
   /// \sa vtkLightBoxRendererManager::SetColorLevel
@@ -119,16 +123,20 @@ public Q_SLOTS:
   /// \sa vtkLightBoxRendererManager::SetColorWindow
   void setColorWindow(double newColorWindow);
 
-  /// Change the number of row of the associated lightBox
-  /// \sa lightBoxRendererManager()
-  /// \sa vtkLightBoxRendererManager::SetRenderWindowRowCount
-  void setLightBoxRendererManagerRowCount(int newRowCount);
+  ///// Change the number of row of the associated lightBox
+  ///// \sa lightBoxRendererManager()
+  ///// \sa vtkLightBoxRendererManager::SetRenderWindowRowCount
+  //void setLightBoxRendererManagerRowCount(int newRowCount);
 
-  /// Change the number of column of the associated lightBox
-  /// \sa lightBoxRendererManager()
-  /// \sa vtkLightBoxRendererManager::SetRenderWindowColumnCount
-  void setLightBoxRendererManagerColumnCount(int newColumnCount);
+  ///// Change the number of column of the associated lightBox
+  ///// \sa lightBoxRendererManager()
+  ///// \sa vtkLightBoxRendererManager::SetRenderWindowColumnCount
+  //void setLightBoxRendererManagerColumnCount(int newColumnCount);
   
+  vtkRenderer* imageRenderer();
+  vtkActor2D* imageActor();
+  vtkImageMapper* imageMapper();
+
 Q_SIGNALS:
   void resized(const QSize& size);
 
