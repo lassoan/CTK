@@ -30,6 +30,7 @@
 #include <QSqlRecord>
 #include <QStringList>
 #include <QUuid>
+#include <QUrl>
 #include <QVariant>
 
 // ctkDICOM includes
@@ -1545,8 +1546,30 @@ void ctkDICOMDatabase::openDatabase(const QString databaseFile, const QString& c
   }
 
   // Set up the tag cache for use later
-  QFileInfo fileInfo(d->DatabaseFileName);
-  d->TagCacheDatabaseFilename = QString( fileInfo.dir().path() + "/ctkDICOMTagCache.sql" );
+  bool tagCacheIsInMemory = false;
+  if (isInMemory())
+    {
+    if (d->DatabaseFileName.startsWith("file:"))
+      {
+      QUrl url(d->DatabaseFileName);
+      if (url.hasQuery())
+        {
+        QString mode = QUrlQuery(url.query()).queryItemValue("mode");
+        if (mode == "memory")
+          {
+          tagCacheIsInMemory = true;
+          url.setPath(url.path() + "_tag_cache");
+          d->TagCacheDatabaseFilename = url.toString();
+          }
+        }
+      }
+    }
+  if (!tagCacheIsInMemory)
+    {
+    QFileInfo fileInfo(d->DatabaseFileName);
+    d->TagCacheDatabaseFilename = QString(fileInfo.dir().path() + "/ctkDICOMTagCache.sql");
+    }
+
   d->TagCacheVerified = false;
   if ( !this->tagCacheExists() )
   {
@@ -2572,7 +2595,23 @@ bool ctkDICOMDatabase::isOpen() const
 bool ctkDICOMDatabase::isInMemory() const
 {
   Q_D(const ctkDICOMDatabase);
-  return d->DatabaseFileName == ":memory:";
+  if (d->DatabaseFileName == ":memory:")
+    {
+    return true;
+    }
+  if (!d->DatabaseFileName.startsWith("file:"))
+    {
+    // not URL mode and not :memory: it means that it is a file
+    return false;
+    }
+  QUrl url(d->DatabaseFileName);
+  if (!url.hasQuery())
+    {
+    // not URL mode and not :memory: it means that it is a file
+    return false;
+    }
+  QString mode = QUrlQuery(url.query()).queryItemValue("mode");
+  return (mode == "memory");
 }
 
 //------------------------------------------------------------------------------
