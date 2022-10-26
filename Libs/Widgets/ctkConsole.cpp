@@ -102,7 +102,8 @@ ctkConsolePrivate::ctkConsolePrivate(ctkConsole& object) :
   CompleterShortcuts(QList<QKeySequence>() << Qt::Key_Tab),
   RunFileOptions(ctkConsole::RunFileShortcut),
   RunFileButton(NULL),
-  RunFileAction(NULL)
+  RunFileAction(NULL),
+  ClearAction(NULL)
 {
 }
 
@@ -141,6 +142,11 @@ void ctkConsolePrivate::init()
   this->RunFileAction->setShortcut(q->tr("Ctrl+g"));
   connect(this->RunFileAction, SIGNAL(triggered()), q, SLOT(runFile()));
   q->addAction(this->RunFileAction);
+
+  this->ClearAction = new QAction(q->tr("C&lear terminal"), q);
+  this->ClearAction->setShortcut(q->tr("Ctrl+l"));
+  connect(this->ClearAction, SIGNAL(triggered()), q, SLOT(clear()));
+  q->addAction(this->ClearAction);
 
   QAction* printHelpAction = new QAction(q->tr("Print &help"),q);
   printHelpAction->setShortcut(q->tr("Ctrl+h"));
@@ -1112,6 +1118,34 @@ void ctkConsolePrivate::pasteText(const QString& text)
 }
 
 //-----------------------------------------------------------------------------
+void ctkConsolePrivate::clearInternal(bool showPythonVersionInfo)
+{
+  this->clear();
+
+  // Setting the text to an empty string causes crashes the application
+  // (when repeatedly hitting Ctrl+l and typing random text),
+  // therefore we set it to contain a single space.
+  this->setText(" ");
+
+  // For some reason the QCompleter tries to set the focus policy to
+  // NoFocus, set let's make sure we set it back to the default WheelFocus.
+  this->setFocusPolicy(Qt::WheelFocus);
+
+  if (showPythonVersionInfo)
+    {
+    this->printWelcomeMessage();
+    }
+
+  this->promptForInput();
+
+  // Remove the placeholder "space" character
+  QTextCursor text_cursor = this->textCursor();
+  text_cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+  text_cursor.insertText("");
+}
+
+
+//-----------------------------------------------------------------------------
 // ctkConsole methods
 
 //-----------------------------------------------------------------------------
@@ -1456,29 +1490,14 @@ void ctkConsole::printErrorMessage(const QString& text)
 void ctkConsole::clear()
 {
   Q_D(ctkConsole);
-
-  d->clear();
-
-  // For some reason the QCompleter tries to set the focus policy to
-  // NoFocus, set let's make sure we set it back to the default WheelFocus.
-  d->setFocusPolicy(Qt::WheelFocus);
-
-  d->promptForInput();
+  d->clearInternal(false);
 }
 
 //-----------------------------------------------------------------------------
 void ctkConsole::reset()
 {
   Q_D(ctkConsole);
-
-  d->clear();
-
-  // For some reason the QCompleter tries to set the focus policy to
-  // NoFocus, set let's make sure we set it back to the default WheelFocus.
-  d->setFocusPolicy(Qt::WheelFocus);
-
-  d->printWelcomeMessage();
-  d->promptForInput();
+  d->clearInternal(true);
 }
 
 //-----------------------------------------------------------------------------

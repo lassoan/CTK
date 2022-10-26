@@ -145,6 +145,10 @@ protected:
 
   /// Paste text at the current text cursor position.
   void pasteText(const QString& text);
+
+  /// Clear the console and optionally show Python version information
+  void clearInternal(bool showPythonVersionInfo);
+
 public:
 
   /// A custom completer
@@ -211,6 +215,7 @@ public:
 
   QPushButton* RunFileButton;
   QAction* RunFileAction;
+  QAction* ClearAction;
 
   /// Store path of last RunFilefile, to make it easier to re-run the same file again.
   QString LastRunFile;
