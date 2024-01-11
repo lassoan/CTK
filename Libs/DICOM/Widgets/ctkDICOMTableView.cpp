@@ -661,6 +661,8 @@ void ctkDICOMTableView::setQuery(const QStringList &uids)
 {
   Q_D(ctkDICOMTableView);
 
+  QStringList oldSelection = this->currentSelection();
+
   QString queryString = ("SELECT DISTINCT %1.* FROM Patients, Series, Studies WHERE "
                    "Patients.UID = Studies.PatientsUID AND Studies.StudyInstanceUID = Series.StudyInstanceUID");
   QList<QVariant> boundValues;
@@ -736,6 +738,20 @@ void ctkDICOMTableView::setQuery(const QStringList &uids)
   else
   {
     d->dicomSQLModel.clear();
+  }
+
+  // Selection model does not detect any changes when a new query is set,
+  // therefore we check manually if selection is changed
+
+  // TODO: Should we try to restore the old selection by uncommenting this line?
+  // (it should not be necessary to lose selection, but maybe restoring it could have performance impact)
+  //  this->setCurrentSelection(oldSelection);
+
+  QStringList newSelection = this->currentSelection();
+  if (oldSelection != newSelection)
+  {
+    // TODO: Check if there is no significant performance impact 
+    emit selectionChanged(newSelection);
   }
 }
 
