@@ -4,6 +4,9 @@
 
 set(proj DCMTK)
 
+set(OpenJPEG_DIR "D:/D/OPENJPEG-install/lib/cmake/openjpeg-2.5")
+find_package(OpenJPEG REQUIRED)
+
 set(${proj}_DEPENDENCIES "")
 
 ExternalProject_Include_Dependencies(${proj}
