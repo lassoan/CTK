@@ -86,7 +86,16 @@ ctkProxyStyle::ctkProxyStyle(QStyle *style, QObject* parent)
 {
   Q_D(ctkProxyStyle);
   d->baseStyle = style;
+  // QProxyStyle::setBaseStyle() unconditionally calls style->setParent(this),
+  // taking QObject ownership. Restore the original parent so shared styles like
+  // qApp->style() are not double-deleted when both the proxy and their real owner
+  // destroy them.
+  QObject* savedParent = style ? style->parent() : nullptr;
   this->setBaseStyle(style);
+  if (style)
+  {
+    style->setParent(savedParent);
+  }
   this->setParent(parent);
 }
 
