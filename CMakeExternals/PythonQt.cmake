@@ -91,7 +91,7 @@ if(NOT DEFINED PYTHONQT_INSTALL_DIR)
 
   ctkFunctionExtractOptimizedLibrary(PYTHON_LIBRARIES PYTHON_LIBRARY)
 
-  set(revision_tag 85de68a83f1b648531bcb90d64567864206cca27) # windows_on_arm (patched-v4.1.0-2026-06-05-9992368e9 with Qt 6.12 fix)
+  set(revision_tag windows_on_arm) # patched-v4.1.0-2026-06-05-9992368e9 with Qt 6.12 fix
   if(${proj}_REVISION_TAG)
     set(revision_tag ${${proj}_REVISION_TAG})
   endif()
