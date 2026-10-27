@@ -27,6 +27,12 @@
 #include <QSet>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QThread>
+
+// STD includes
+#include <atomic>
+#include <thread>
+#include <vector>
 #include <QSqlRecord>
 #include <QStringList>
 #include <QUuid>
@@ -2946,8 +2952,85 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
   d->TagCacheDatabase.transaction();
   d->Database.transaction();
 
-  foreach(const ctkDICOMDatabase::IndexingResult & indexingResult, indexingResults)
+  // Tags to precache with their keys, and statements that insert the values of all tags of an instance
+  // into the tag cache at once (one statement per instance instead of one per tag)
+  struct PrecachedTag
   {
+    QString tag;
+    DcmTagKey key;
+    bool excludeFromStorage;
+  };
+  QList<PrecachedTag> precachedTags;
+  foreach(const QString& tag, d->TagsToPrecache)
+  {
+    PrecachedTag precachedTag;
+    precachedTag.tag = tag;
+    unsigned short group, element;
+    this->tagToGroupElement(tag, group, element);
+    precachedTag.key = DcmTagKey(group, element);
+    precachedTag.excludeFromStorage = d->TagsToExcludeFromStorage.contains(tag);
+    precachedTags << precachedTag;
+  }
+  const int maximumTagsPerStatement = 250; // 3 bound values per tag, well below the SQLite limit of bound variables
+  QList<QSqlQuery> insertTagsStatements;
+  for (int firstTag = 0; firstTag < precachedTags.size(); firstTag += maximumTagsPerStatement)
+  {
+    int tagCount = qMin(maximumTagsPerStatement, precachedTags.size() - firstTag);
+    QStringList rows;
+    for (int i = 0; i < tagCount; ++i)
+    {
+      rows << "(?,?,?)";
+    }
+    QSqlQuery insertTags(d->TagCacheDatabase);
+    insertTags.prepare("INSERT OR REPLACE INTO TagCache VALUES " + rows.join(","));
+    insertTagsStatements << insertTags;
+  }
+
+  // Values of the tags to precache of all instances, extracted in parallel: reading the values from the
+  // datasets (with character set conversion) takes most of the insert time, and it does not need the database
+  const int numberOfResults = indexingResults.size();
+  std::vector<QStringList> precachedValues(numberOfResults);
+  {
+    std::atomic<int> nextResultIndex(0);
+    auto extractValues = [&]()
+    {
+      for (int resultIndex = nextResultIndex++; resultIndex < numberOfResults; resultIndex = nextResultIndex++)
+      {
+        const ctkDICOMItem& dataset = *indexingResults[resultIndex].dataset.data();
+        QStringList values;
+        values.reserve(precachedTags.size());
+        foreach(const PrecachedTag& precachedTag, precachedTags)
+        {
+          QString value;
+          if (precachedTag.excludeFromStorage)
+          {
+            value = dataset.TagExists(precachedTag.key) ? ValueIsNotStored : TagNotInInstance;
+          }
+          else
+          {
+            value = dataset.GetAllElementValuesAsString(precachedTag.key);
+          }
+          values << (value.isEmpty() ? TagNotInInstance : value);
+        }
+        precachedValues[resultIndex] = values;
+      }
+    };
+    const int numberOfThreads = qBound(1, qMin(QThread::idealThreadCount(), numberOfResults), 16);
+    std::vector<std::thread> threads;
+    for (int threadIndex = 1; threadIndex < numberOfThreads; ++threadIndex)
+    {
+      threads.emplace_back(extractValues);
+    }
+    extractValues();
+    for (std::thread& thread : threads)
+    {
+      thread.join();
+    }
+  }
+
+  for (int resultIndex = 0; resultIndex < numberOfResults; ++resultIndex)
+  {
+    const ctkDICOMDatabase::IndexingResult& indexingResult = indexingResults[resultIndex];
     const ctkDICOMItem& dataset = *indexingResult.dataset.data();
     QString filePath = indexingResult.filePath;
     bool generateThumbnail = false; // thumbnail will be generated when needed, don't slow down import with that
@@ -3014,38 +3097,18 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
     if (!storedFilePath.isEmpty() && !seriesInstanceUID.isEmpty())
     {
       // Insert all pre-cached fields into tag cache
-      QSqlQuery insertTags(d->TagCacheDatabase);
-      insertTags.prepare("INSERT OR REPLACE INTO TagCache VALUES(?,?,?)");
-      insertTags.bindValue(0, sopInstanceUID);
-      foreach(const QString & tag, d->TagsToPrecache)
+      for (int statementIndex = 0; statementIndex < insertTagsStatements.size(); ++statementIndex)
       {
-        unsigned short group, element;
-        this->tagToGroupElement(tag, group, element);
-        DcmTagKey tagKey(group, element);
-        QString value;
-        if (d->TagsToExcludeFromStorage.contains(tag))
+        QSqlQuery& insertTags = insertTagsStatements[statementIndex];
+        int firstTag = statementIndex * maximumTagsPerStatement;
+        int tagCount = qMin(maximumTagsPerStatement, precachedTags.size() - firstTag);
+        int bindIndex = 0;
+        const QStringList& values = precachedValues[resultIndex];
+        for (int i = 0; i < tagCount; ++i)
         {
-          if (dataset.TagExists(tagKey))
-          {
-            value = ValueIsNotStored;
-          }
-          else
-          {
-            value = TagNotInInstance;
-          }
-        }
-        else
-        {
-          value = dataset.GetAllElementValuesAsString(tagKey);
-        }
-        insertTags.bindValue(1, tag);
-        if (value.isEmpty())
-        {
-          insertTags.bindValue(2, TagNotInInstance);
-        }
-        else
-        {
-          insertTags.bindValue(2, value);
+          insertTags.bindValue(bindIndex++, sopInstanceUID);
+          insertTags.bindValue(bindIndex++, precachedTags[firstTag + i].tag);
+          insertTags.bindValue(bindIndex++, values[firstTag + i]);
         }
         insertTags.exec();
       }
