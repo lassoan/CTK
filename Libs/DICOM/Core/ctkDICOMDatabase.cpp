@@ -970,7 +970,7 @@ bool ctkDICOMDatabasePrivate::uidsForDataSet(QString& patientsName, QString& pat
   {
     // Use study instance uid as patient id if patient id is empty - can happen on anonymized datasets
     // see: http://www.na-mic.org/Bug/view.php?id=2040
-    logger.warn(QString("Patient ID is empty, using studyInstanceUID (%1) as patient ID").arg(studyInstanceUID));
+    // (the warning is logged once per study and import by logEmptyPatientIDWarnings, see recordEmptyPatientID)
     patientID = studyInstanceUID;
   }
   if (patientsName.isEmpty() && !patientID.isEmpty())
@@ -987,6 +987,28 @@ bool ctkDICOMDatabasePrivate::uidsForDataSet(QString& patientsName, QString& pat
   }
   // Valid data set
   return true;
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabasePrivate::recordEmptyPatientID(const QString& studyInstanceUID, const QString& filePath)
+{
+  QPair<int, QString>& study = this->EmptyPatientIDStudies[studyInstanceUID];
+  if (study.first++ == 0)
+  {
+    study.second = filePath;
+  }
+}
+
+//------------------------------------------------------------------------------
+void ctkDICOMDatabasePrivate::logEmptyPatientIDWarnings()
+{
+  for (QMap<QString, QPair<int, QString> >::const_iterator studyIt = this->EmptyPatientIDStudies.constBegin();
+       studyIt != this->EmptyPatientIDStudies.constEnd(); ++studyIt)
+  {
+    logger.warn(QString("Patient ID is empty in %1 file(s) of study %2 (for example %3), using the study instance UID as patient ID")
+      .arg(studyIt.value().first).arg(studyIt.key()).arg(studyIt.value().second));
+  }
+  this->EmptyPatientIDStudies.clear();
 }
 
 //------------------------------------------------------------------------------
@@ -1032,6 +1054,10 @@ void ctkDICOMDatabasePrivate::insert(const ctkDICOMItem& dataset, const QString&
   {
     // error occurred, message is already logged
     return;
+  }
+  if (dataset.GetElementAsString(DCM_PatientID).isEmpty())
+  {
+    this->recordEmptyPatientID(studyInstanceUID, filePath);
   }
 
   // Store a copy of the dataset
@@ -1787,6 +1813,7 @@ ctkDICOMDisplayedFieldGenerator* ctkDICOMDatabase::displayedFieldGenerator() con
 void ctkDICOMDatabase::closeDatabase()
 {
   Q_D(ctkDICOMDatabase);
+  d->logEmptyPatientIDWarnings();
   bool wasOpen = this->isOpen();
   d->Database.close();
   d->TagCacheDatabase.close();
@@ -3077,6 +3104,7 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
     const ctkDICOMItem& dataset = *indexingResult.dataset.data();
     QString filePath = indexingResult.filePath;
     bool generateThumbnail = false; // thumbnail will be generated when needed, don't slow down import with that
+    bool patientIDIsEmpty = dataset.GetElementAsString(DCM_PatientID).isEmpty();
     bool storeFile = indexingResult.copyFile;
 
     // Check to see if the file has already been loaded
@@ -3121,6 +3149,10 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
     {
       logger.error("Failed to insert file into database (required fields missing): " + filePath);
       continue;
+    }
+    if (patientIDIsEmpty)
+    {
+      d->recordEmptyPatientID(studyInstanceUID, filePath);
     }
 
     // Store a copy of the dataset
@@ -4098,6 +4130,8 @@ void ctkDICOMDatabase::removeCachedTags(const QString sopInstanceUID)
 void ctkDICOMDatabase::updateDisplayedFields()
 {
   Q_D(ctkDICOMDatabase);
+  // Warnings about the files inserted since the last update (the indexer updates the displayed fields at the end of an import)
+  d->logEmptyPatientIDWarnings();
 
   // Get the files for which the displayed fields have not been created yet (DisplayedFieldsUpdatedTimestamp is NULL)
   // Note: The per-instance update only covers insertion and schema update. If fields on the series/study/patient level need to be

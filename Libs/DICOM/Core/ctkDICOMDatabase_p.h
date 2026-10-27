@@ -77,8 +77,17 @@ public:
   bool indexingStatusForFile(const QString& filePath, const QString& sopInstanceUID, bool& datasetInDatabase, bool& datasetUpToDate, QString& databaseFilename);
 
   /// Get basic UIDs for a data set, return true if the data set has all the required tags
+  /// Get the patient and study identifiers of a dataset. If the patient ID is empty, the study instance UID is used
+  /// as patient ID (see recordEmptyPatientID).
   bool uidsForDataSet(const ctkDICOMItem& dataset, QString& patientsName, QString& patientID, QString& studyInstanceUID, QString& seriesInstanceUID);
   bool uidsForDataSet(QString& patientsName, QString& patientID, QString& studyInstanceUID);
+  /// Record a file with empty patient ID (the study instance UID is used as patient ID). One warning per study is logged
+  /// by logEmptyPatientIDWarnings (at the end of an import, when the displayed fields are updated, or when the database
+  /// is closed) with the number of files and an example file, instead of one warning per file.
+  void recordEmptyPatientID(const QString& studyInstanceUID, const QString& filePath);
+  void logEmptyPatientIDWarnings();
+  /// Studies with empty patient ID in the files inserted since the last logEmptyPatientIDWarnings: number of files and an example file
+  QMap<QString, QPair<int, QString> > EmptyPatientIDStudies;
 
   /// Dataset must be set always
   /// \param filePath It has to be set if this is an import of an actual file
