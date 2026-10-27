@@ -27,6 +27,11 @@
 #ifndef __ctkTest_h
 #define __ctkTest_h
 
+// QTEST_DISABLE_KEYPAD_NAVIGATION was removed in Qt 6.12
+#ifndef QTEST_DISABLE_KEYPAD_NAVIGATION
+# define QTEST_DISABLE_KEYPAD_NAVIGATION
+#endif
+
 #define CTK_TEST_NOOP_MAIN(TestObject) \
 int TestObject(int argc, char *argv[]) \
 { \
