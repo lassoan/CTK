@@ -3143,8 +3143,9 @@ void ctkDICOMDatabase::insert(const QList<ctkDICOMDatabase::IndexingResult>& ind
       QSqlQuery insertTags(d->TagCacheDatabase);
       insertTags.prepare("INSERT OR REPLACE INTO TagCache VALUES(?,?,?)");
       insertTags.bindValue(0, sopInstanceUID);
-      foreach(const QString & tag, d->TagsToPrecache)
+      foreach(const QString & tagInput, d->TagsToPrecache)
       {
+        QString tag = tagInput.toUpper();
         unsigned short group, element;
         this->tagToGroupElement(tag, group, element);
         DcmTagKey tagKey(group, element);
@@ -3494,11 +3495,21 @@ ctkDICOMDatabase::InsertResult ctkDICOMDatabase::insert(const QList<ctkDICOMJobR
 void ctkDICOMDatabase::setTagsToPrecache(const QStringList tags)
 {
   Q_D(ctkDICOMDatabase);
-  if (d->TagsToPrecache == tags)
+  // Tags are stored in upper case in the tag cache
+  QStringList upperTags;
+  foreach (const QString &tagInput, tags)
+  {
+    QString tag = tagInput.toUpper();
+    if (!upperTags.contains(tag))
+    {
+      upperTags << tag;
+    }
+  }
+  if (d->TagsToPrecache == upperTags)
   {
     return;
   }
-  d->TagsToPrecache = tags;
+  d->TagsToPrecache = upperTags;
   emit tagsToPrecacheChanged();
 }
 
